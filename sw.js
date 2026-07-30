@@ -10,7 +10,7 @@
  * Alles andere (Icons, Manifest) laeuft "cache first" mit stiller Erneuerung
  * im Hintergrund. Das sind statische Dateien, da ist Tempo wichtiger.
  */
-const CACHE = "training-v3";
+const CACHE = "training-v4";
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
   "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"
@@ -42,6 +42,27 @@ function isDocument(req){
   return /\/(index\.html)?(\?.*)?$/.test(new URL(req.url).pathname + (new URL(req.url).search || ""));
 }
 
+/* Das Dokument bewusst am HTTP-Cache vorbei holen: GitHub Pages liefert
+ * max-age=600, sonst koennte der Browser bis zu zehn Minuten nach einem
+ * Deployment weiter die alte Datei ausgeben.
+ *
+ * Mit Zeitlimit, damit ein lahmes Netz den Start nicht blockiert. Laeuft es ab,
+ * greift der Cache-Fallback und die neue Version kommt beim naechsten Start.
+ */
+const DOC_TIMEOUT = 2500;
+function freshDocument(req){
+  let ctrl = null, timer = null;
+  try { ctrl = new AbortController(); } catch(e){}
+  const opts = {cache:"no-store"};
+  if (ctrl) {
+    opts.signal = ctrl.signal;
+    timer = setTimeout(() => { try { ctrl.abort(); } catch(e){} }, DOC_TIMEOUT);
+  }
+  const clear = () => { if (timer) clearTimeout(timer); };
+  return fetch(req.url, opts).then(res => { clear(); return res; },
+                                   err => { clear(); throw err; });
+}
+
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
@@ -49,7 +70,7 @@ self.addEventListener("fetch", e => {
 
   if (isDocument(req)) {
     e.respondWith(
-      fetch(req)
+      freshDocument(req)
         .then(res => {
           if (res && res.ok) {
             const copy = res.clone();
