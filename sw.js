@@ -1,12 +1,29 @@
-/* Offline-Cache: App-Shell beim ersten Aufruf ablegen, danach ohne Netz starten. */
-const CACHE = "training-v2";
+/* Offline-Cache der App-Shell.
+ *
+ * Zwei Strategien, bewusst getrennt:
+ *
+ * Das HTML-Dokument laeuft "network first". Mit Netz kommt immer die aktuelle
+ * Version, ohne Netz die letzte gecachte. Nur so sieht ein Update sofort und
+ * nicht erst beim zweiten Start. Die frueher benutzte "cache first"-Variante
+ * lieferte hartnaeckig die alte App aus, auch wenn online schon die neue lag.
+ *
+ * Alles andere (Icons, Manifest) laeuft "cache first" mit stiller Erneuerung
+ * im Hintergrund. Das sind statische Dateien, da ist Tempo wichtiger.
+ */
+const CACHE = "training-v3";
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
   "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      /* reload: umgeht den HTTP-Cache, sonst landen beim Update alte Kopien im neuen Cache */
+      .then(c => c.addAll(FILES.map(f => new Request(f, {cache:"reload"}))))
+      .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", e => {
@@ -17,23 +34,54 @@ self.addEventListener("activate", e => {
   );
 });
 
+/* Anfragen, bei denen Aktualitaet vor Tempo geht: die Seite selbst. */
+function isDocument(req){
+  if (req.mode === "navigate") return true;
+  const dest = req.destination;
+  if (dest === "document") return true;
+  return /\/(index\.html)?(\?.*)?$/.test(new URL(req.url).pathname + (new URL(req.url).search || ""));
+}
+
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET") return;
+  const req = e.request;
+  if (req.method !== "GET") return;
+  if (new URL(req.url).origin !== self.location.origin) return;
+
+  if (isDocument(req)) {
+    e.respondWith(
+      fetch(req)
+        .then(res => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put("./index.html", copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match("./index.html").then(hit => hit || caches.match("./")))
+    );
+    return;
+  }
+
   e.respondWith(
-    caches.match(e.request).then(hit => {
+    caches.match(req).then(hit => {
       if (hit) {
-        fetch(e.request).then(res => {
-          if (res && res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        fetch(req).then(res => {
+          if (res && res.ok) caches.open(CACHE).then(c => c.put(req, res.clone())).catch(() => {});
         }).catch(() => {});
         return hit;
       }
-      return fetch(e.request).then(res => {
+      return fetch(req).then(res => {
         if (res && res.ok) {
           const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, copy));
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
         }
         return res;
       }).catch(() => caches.match("./index.html"));
     })
   );
+});
+
+/* Erlaubt der Seite, ein Update aktiv anzustossen (Mehr > Auf Update pruefen). */
+self.addEventListener("message", e => {
+  if (e.data === "skipWaiting") self.skipWaiting();
 });

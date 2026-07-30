@@ -90,6 +90,19 @@ auch in einem Unterordner.
 
 ## Update ausrollen
 
-Änderungen committen und pushen. Wird dabei eine der gecachten Dateien angefasst,
-muss in `sw.js` die Konstante `CACHE` hochgezählt werden (`training-v1` →
-`training-v2`), sonst behalten bereits installierte Geräte die alte Version.
+Änderungen committen und pushen, GitHub Pages baut automatisch.
+
+Das HTML-Dokument wird vom Service Worker **network first** ausgeliefert: mit Netz
+kommt immer die aktuelle Version, ohne Netz die letzte gecachte. Ein Update ist
+deshalb schon beim ersten Neustart der App da und nicht erst beim zweiten.
+
+Zwei Dinge beim Ausrollen mitziehen:
+
+- `APP_VERSION` in `index.html` hochzählen. Der Wert steht in der App unter
+  **Mehr › Version** und ist der einzige verlässliche Weg, am Gerät zu sehen,
+  welcher Stand wirklich läuft.
+- `CACHE` in `sw.js` hochzählen, wenn Icons oder Manifest angefasst wurden. Diese
+  Dateien werden weiterhin cache-first ausgeliefert.
+
+Wenn ein Gerät trotzdem hängt: **Mehr › Auf Update prüfen** fragt aktiv beim Server
+nach, übernimmt einen wartenden Service Worker und startet die App neu.

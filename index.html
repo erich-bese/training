@@ -396,6 +396,10 @@
 <script>
 "use strict";
 
+/* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
+   auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
+const APP_VERSION = "2.1";
+
 /* ================================================================== icons */
 const I = {
   plus:'<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
@@ -1140,8 +1144,13 @@ function viewMehr(){
     + '<button class="btn ghost" data-a="import">Backup einspielen</button>'
     + '<button class="btn danger" data-a="reset" style="margin-top:10px">Alles zurücksetzen</button>'
     + '<div class="note" id="msg" style="padding:13px 4px 0"></div></div>'
-    + '<div class="note" style="padding:0 4px 8px">Alles liegt auf diesem Gerät. Kein Konto, keine Cloud, kein Server. '
-    + 'Beim Einspielen kannst du wählen, ob zusammengeführt oder ersetzt wird.</div>';
+    + '<div class="note" style="padding:0 4px 20px">Alles liegt auf diesem Gerät. Kein Konto, keine Cloud, kein Server. '
+    + 'Beim Einspielen kannst du wählen, ob zusammengeführt oder ersetzt wird.</div>'
+
+    + '<div class="stack"><div class="eyebrow"><span>Version</span><span class="faint num">'+APP_VERSION+'</span></div>'
+    + '<button class="btn ghost" data-a="update">Auf Update prüfen</button>'
+    + '<div class="note" id="upd" style="padding:13px 4px 0">Holt die neueste Version vom Server und startet die App neu. '
+    + 'Deine Daten bleiben dabei erhalten.</div></div>';
 }
 
 /* ------------------------------------------------------- view: plan editor */
@@ -1582,6 +1591,27 @@ function applyImport(d, mode){
   msg(added ? added + " Einheiten ergänzt." : "Nichts Neues in der Datei.");
 }
 function msg(t){ const el = document.getElementById("msg"); if (el) el.textContent = t; }
+function updMsg(t){ const el = document.getElementById("upd"); if (el) el.textContent = t; }
+
+/* Aktiv nach einer neuen Version fragen, statt auf den Browser zu warten.
+   Ein wartender Worker wird uebernommen, danach laedt die Seite neu. */
+function checkUpdate(){
+  if (!("serviceWorker" in navigator)) { updMsg("Dieser Browser unterstützt keine Updates im Hintergrund."); return; }
+  updMsg("Suche nach einer neuen Version …");
+  navigator.serviceWorker.getRegistration().then(reg => {
+    if (!reg) { location.reload(); return; }
+    return reg.update().then(() => {
+      const fresh = reg.waiting || reg.installing;
+      if (fresh) {
+        updMsg("Neue Version gefunden. Starte neu …");
+        if (reg.waiting) reg.waiting.postMessage("skipWaiting");
+        setTimeout(() => location.reload(), 700);
+      } else {
+        updMsg("Du bist auf dem aktuellen Stand (Version " + APP_VERSION + ").");
+      }
+    });
+  }).catch(() => updMsg("Prüfung fehlgeschlagen. Bist du online?"));
+}
 
 /* ================================================================ events */
 document.addEventListener("click", ev => {
@@ -1698,6 +1728,7 @@ document.addEventListener("click", ev => {
   }
   if (a === "export") { exportBackup(); return; }
   if (a === "import") { importBackup(); return; }
+  if (a === "update") { checkUpdate(); return; }
   if (a === "reset") {
     if (confirm("Alle Einheiten, Gewichte und Einstellungen löschen? Das lässt sich nicht rückgängig machen.")) {
       S = EMPTY(); save(); route = null; render(); msg("Alles zurückgesetzt.");
