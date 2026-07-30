@@ -1,5 +1,5 @@
 /* Offline-Cache: App-Shell beim ersten Aufruf ablegen, danach ohne Netz starten. */
-const CACHE = "training-v1";
+const CACHE = "training-v2";
 const FILES = [
   "./", "./index.html", "./manifest.webmanifest",
   "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png"

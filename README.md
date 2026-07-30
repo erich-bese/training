@@ -8,15 +8,30 @@ kein Tracking.
 
 - **Heute** – zeigt die für den Wochentag geplante Einheit (Push, Pull, Beine im
   A/B-Wechsel), startet das Training, zählt Sätze und Wiederholungen mit und blendet
-  nach jedem Satz einen Pausentimer ein.
-- **Automatische Gewichtssteuerung** – nach jeder Einheit wird ausgewertet: alle Sätze
-  im Zielbereich bedeutet Gewicht rauf, dreimal in Folge unter dem Ziel bedeutet
-  10 % runter. Die Empfehlung erscheint als „Nächstes Mal“-Karte.
-- **Verlauf** – Monatskalender mit farbig markierten Trainingstagen plus die letzten
-  Einheiten im Detail, filterbar nach Push, Pull und Beine.
-- **Fortschritt** – Hauptziele mit Fortschrittsbalken, Trainings pro Woche,
-  Gesamtwiederholungen, bewegtes Gewicht und persönliche Rekorde.
-- **Mehr** – Körpergewicht, Länge der Satzpause, Backup und Zurücksetzen.
+  nach jedem Satz einen Pausentimer ein. Der Timer läuft auf Zeitstempel, überlebt
+  also Hintergrund, Bildschirmsperre und App-Neustart.
+- **Duell gegen das letzte Mal** – während der Einheit rechnet die App die bewegte
+  Tonnage laufend gegen dieselbe Einheit beim letzten Mal und zeigt den Abstand in
+  Prozent. Pro Übung steht darunter, was letztes Mal geschafft wurde.
+- **Automatische Gewichtssteuerung** – alle Sätze im Zielbereich bedeutet Gewicht
+  rauf, dreimal in Folge unter dem Ziel bedeutet 10 % runter. Gesteigert wird in der
+  Stufe, die das Gerät zulässt: 1 kg am Kabelzug, 1,25 kg an Scheiben.
+- **Scheiben-Rechner** – bei Klimmzügen und Dips rechnet die App aus dem eingestellten
+  Zusatzgewicht, welche Scheiben auf den Gürtel müssen.
+- **Verlauf** – Monatskalender mit farbig markierten Trainingstagen. Jede Einheit ist
+  antippbar und öffnet die volle Auswertung: alle Sätze, Tonnage, Dauer, Vergleich zur
+  vorigen gleichen Einheit.
+- **Übungsverlauf** – jede Übung antippbar, mit Kurve des geschätzten 1RM über alle
+  Einheiten und Einzelauflistung.
+- **Fortschritt** – Ziele als Etappen statt als unerreichbarer Endwert, Einheiten pro
+  Kalenderwoche gegen ein Wochenziel, Gesamtzahlen und Rekorde.
+- **Ausgefallene Übungen** – Übung mit Grund als ausgefallen markieren (Gerät belegt,
+  Schmerzen …). Sie landet in der Nachhol-Liste und wird beim nächsten passenden
+  Training automatisch angehängt.
+- **Pro Seite oder Gesamt** – pro Übung einstellbar, dazu Zusatzlast für exzentrische
+  Betonung und Kette sowie ein freier Variantenname.
+- **Plan-Editor** – Übungen tauschen, hinzufügen, entfernen, umsortieren, Sätze,
+  Wiederholungsbereiche und Gewichtsschritte anpassen.
 
 ## Installation auf dem iPhone
 
@@ -46,10 +61,15 @@ Deshalb regelmäßig ein Backup ziehen.
 Dateien oder iCloud Drive. Die Datei enthält den kompletten Stand: alle Einheiten,
 die aktuellen Arbeitsgewichte und die Einstellungen.
 
-**Importieren:** Tab **Mehr › Backup importieren**, dann die JSON-Datei auswählen.
-Der Import **ersetzt** den lokalen Stand vollständig, er fügt nichts zusammen. Ein
-laufendes, noch nicht abgeschlossenes Training wird dabei verworfen. So zieht man den
-Stand auch auf ein neues Gerät um: auf dem alten exportieren, auf dem neuen importieren.
+**Einspielen:** Tab **Mehr › Backup einspielen**, dann die JSON-Datei auswählen.
+Danach fragt die App, was passieren soll:
+
+- **Zusammenführen** – ergänzt nur die Einheiten, die auf diesem Gerät fehlen.
+  Erkennt Duplikate an ID sowie an Datum und Plan. Nichts geht verloren.
+- **Ersetzen** – verwirft den lokalen Stand komplett und übernimmt die Datei.
+
+So zieht man den Stand auf ein neues Gerät um: auf dem alten exportieren, auf dem
+neuen einspielen.
 
 Dateien aus fremden Quellen werden abgewiesen – akzeptiert wird nur ein Export
 dieser App.
