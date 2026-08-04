@@ -53,8 +53,9 @@
   #bg::before{
     content:""; position:absolute; inset:0;
     background:
-      radial-gradient(90% 55% at 12% -8%, rgba(233,166,60,.085), transparent 62%),
-      radial-gradient(80% 50% at 92% 104%, rgba(127,166,201,.055), transparent 60%);
+      radial-gradient(88% 52% at 10% -10%, rgba(233,166,60,.16), transparent 64%),
+      radial-gradient(70% 38% at 88% 8%, rgba(127,166,201,.07), transparent 62%),
+      radial-gradient(85% 48% at 92% 104%, rgba(127,166,201,.10), transparent 62%);
   }
   #bg::after{
     content:""; position:absolute; inset:0; opacity:.032; mix-blend-mode:overlay;
@@ -71,7 +72,7 @@
   }
   .wrap{
     max-width:470px; margin:0 auto;
-    padding:0 20px calc(var(--pad-b,132px) + env(safe-area-inset-bottom));
+    padding:env(safe-area-inset-top) 20px calc(var(--pad-b,132px) + env(safe-area-inset-bottom));
   }
   .wrap.flat{--pad-b:44px}
 
@@ -88,10 +89,19 @@
     color:var(--muted); font-weight:600; padding:0 2px 11px; display:flex;
     justify-content:space-between; align-items:baseline;
   }
+  /* Tiefe statt Flaeche. Eine dunkle Oberflaeche wirkt nur dann wertig, wenn
+     sie beleuchtet aussieht: Verlauf von oben hell nach unten dunkel, eine
+     haarfeine Lichtkante an der Oberkante, darunter ein weicher Schatten, der
+     die Karte vom Hintergrund abhebt. Ohne das liegt alles auf einer Ebene. */
   .card{
-    background:var(--card); border:1px solid var(--line);
+    background:linear-gradient(180deg,
+      rgba(255,255,255,.155), rgba(255,255,255,.098) 46%, rgba(255,255,255,.082));
+    border:1px solid rgba(255,255,255,.115);
     border-radius:var(--r-lg); padding:19px;
     backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.055) inset,
+      0 12px 30px -14px rgba(0,0,0,.8);
   }
   .card.tight{padding:15px 17px}
   .card+.card{margin-top:9px}
@@ -117,17 +127,49 @@
     font-weight:600; margin-bottom:11px; display:flex; gap:9px; align-items:center;
   }
   .hero .meta i{width:3px; height:3px; border-radius:2px; background:var(--faint); display:block}
-  .hero .title{font-size:41px; font-weight:700; letter-spacing:-.042em; line-height:1.02}
+  /* Der Titel traegt die Farbe des Plans. Ein Schein in derselben Farbe macht
+     aus der Zeile den Blickfang der Seite, ohne eine Flaeche dafuer zu opfern. */
+  .hero .title{
+    font-size:44px; font-weight:720; letter-spacing:-.045em; line-height:1.0;
+    text-shadow:0 0 42px color-mix(in srgb, currentColor 42%, transparent);
+  }
   .hero .sub{color:var(--muted); font-size:14px; margin-top:9px}
+
+  /* Kennzahlenzeile direkt unter dem Titel: drei Werte, die beim Aufschlagen
+     der App sofort sagen, wo man steht. Bewusst ohne Karten — sie soll zum
+     Titel gehoeren, nicht als eigener Block darunter stehen. */
+  .herostats{
+    display:flex; gap:26px; margin-top:19px; padding-top:17px;
+    border-top:1px solid var(--line);
+  }
+  .hstat{display:flex; flex-direction:column; gap:3px}
+  .hstat .hs-v{
+    font-size:25px; font-weight:700; letter-spacing:-.045em; line-height:1;
+    font-family:var(--sans); font-variant-numeric:tabular-nums;
+  }
+  .hstat .hs-v small{font-size:12.5px; font-weight:600; color:var(--muted); margin-left:3px; letter-spacing:0}
+  /* Ein Wort an Stelle einer Zahl traegt bei gleicher Groesse deutlich mehr
+     Gewicht. Kleiner gesetzt steht es wieder auf einer Stufe mit den Zahlen. */
+  .hstat .hs-v.word{font-size:19px; font-weight:660; letter-spacing:-.03em}
+  .hstat .hs-l{
+    font-size:9.5px; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--faint); font-weight:640;
+  }
 
   /* ---- buttons ---- */
   .btn{
     width:100%; padding:17px 20px; border-radius:var(--r-md); font-size:15.5px;
-    font-weight:640; letter-spacing:-.012em; background:var(--bone); color:#0A0A0B;
+    font-weight:640; letter-spacing:-.012em; color:#0A0A0B;
+    background:linear-gradient(180deg,#FFFEFB,#E7E3DA);
+    box-shadow:0 1px 0 rgba(255,255,255,.85) inset, 0 10px 24px -12px rgba(0,0,0,.85);
     transition:transform .13s var(--ease), opacity .2s;
   }
   .btn:active{transform:scale(.982)}
-  .btn.ghost{background:var(--card-2); color:var(--bone); border:1px solid var(--line)}
+  .btn.ghost{
+    background:linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.042));
+    color:var(--bone); border:1px solid var(--line);
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset;
+  }
   .btn.danger{background:transparent; color:var(--red); border:1px solid var(--line)}
   .btn[disabled]{background:var(--card-2); color:var(--faint); pointer-events:none; border:1px solid var(--line)}
   .btn+.btn{margin-top:9px}
@@ -203,15 +245,37 @@
 
   /* Uebungszeichnung: zwei Bilder uebereinander, gegenlaeufig ein- und
      ausgeblendet. Beide gleichzeitig sichtbar zu lassen ergaebe ein Doppelbild. */
-  .exart{position:relative; width:var(--w,44px); height:var(--h,58px); flex-shrink:0; color:var(--bone); opacity:.92}
-  .exart svg{position:absolute; inset:0; width:100%; height:100%}
-  .exart .f1{animation:artA 1.7s ease-in-out infinite alternate}
-  .exart .f2{animation:artB 1.7s ease-in-out infinite alternate}
-  @keyframes artA{0%,72%{opacity:1} 84%,100%{opacity:0}}
-  @keyframes artB{0%,72%{opacity:0} 84%,100%{opacity:1}}
+  /* Zwei Standbilder werden erst dann zu einer Bewegung, wenn sich beim
+     Ueberblenden auch etwas verschiebt. Deshalb drei Aenderungen gegenueber
+     dem harten Schnitt von frueher:
+     — die Ueberblendung dauert fast die halbe Runde statt eines Wimpernschlags
+     — der Koerper hebt sich beim Zusammenziehen leicht und wird groesser
+     — die Kurve ist schnell hinein und langsam hinaus, wie eine echte Wiederholung
+     will-change hebt die Ebenen auf die Grafikkarte; ohne das ruckelt es auf
+     dem Geraet, weil die Zeichnungen aus vielen Pfaden bestehen. */
+  .exart{
+    position:relative; width:var(--w,44px); height:var(--h,58px); flex-shrink:0;
+    color:var(--bone); opacity:.92;
+    animation:artMove 2.2s cubic-bezier(.42,.03,.34,1) infinite alternate;
+    will-change:transform;
+  }
+  .exart svg{position:absolute; inset:0; width:100%; height:100%; will-change:opacity}
+  .exart .f1{animation:artA 2.2s cubic-bezier(.42,.03,.34,1) infinite alternate}
+  .exart .f2{animation:artB 2.2s cubic-bezier(.42,.03,.34,1) infinite alternate}
+  @keyframes artA{0%,26%{opacity:1} 74%,100%{opacity:0}}
+  @keyframes artB{0%,26%{opacity:0} 74%,100%{opacity:1}}
+  @keyframes artMove{0%,18%{transform:none} 100%{transform:translateY(-3%) scale(1.045)}}
+
+  /* Muskelkarte: die belasteten Gruppen leuchten nacheinander auf, statt
+     fertig dazustehen. Nur bei echtem Ansichtswechsel — sonst flackert die
+     Karte bei jeder Eingabe. */
+  @keyframes mgIn{from{opacity:.28} to{opacity:1}}
+  .anim .bodies .mg{animation:mgIn .6s var(--ease) both; animation-delay:var(--d,0s)}
+
   @media (prefers-reduced-motion:reduce){
-    .exart .f1,.exart .f2{animation:none}
+    .exart,.exart .f1,.exart .f2{animation:none}
     .exart .f2{opacity:0}
+    .anim .bodies .mg{animation:none}
   }
 
   /* ---- lists ---- */
@@ -298,6 +362,17 @@
   .spark .area{fill:url(#sg); stroke:none}
   .spark circle{fill:var(--amber)}
 
+  /* Gegenstueck zum Verlauf unter der Leiste: der Inhalt schiebt sich beim
+     Scrollen unter Uhrzeit und Dynamic Island durch, statt hart an ihnen
+     abzuschneiden. Ohne Statusleiste — also im Browser — ist der Streifen
+     null hoch und damit unsichtbar. */
+  #topfade{
+    position:fixed; left:0; right:0; top:0; z-index:30; pointer-events:none;
+    height:calc(env(safe-area-inset-top) + 12px);
+    background:linear-gradient(to bottom,
+      var(--bg) 34%, rgba(8,9,10,.74) 70%, rgba(8,9,10,0));
+  }
+
   /* ---- bottom bars ---- */
   .tabbar{
     position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; justify-content:center;
@@ -306,17 +381,25 @@
   }
   .tabbar .inner{
     pointer-events:auto; display:flex; gap:3px; max-width:430px; width:100%;
-    margin:0 20px calc(20px + env(safe-area-inset-bottom));
-    background:rgba(24,25,28,.78); backdrop-filter:blur(26px) saturate(160%);
-    -webkit-backdrop-filter:blur(26px) saturate(160%);
-    border:1px solid var(--line); border-radius:21px; padding:5px;
+    margin:0 20px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg, rgba(40,42,48,.80), rgba(20,21,24,.86));
+    backdrop-filter:blur(34px) saturate(185%);
+    -webkit-backdrop-filter:blur(34px) saturate(185%);
+    border:1px solid rgba(255,255,255,.10); border-radius:21px; padding:5px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.075) inset,
+      0 16px 40px -12px rgba(0,0,0,.9);
   }
   .tab{
     flex:1; border-radius:16px; padding:9px 0 8px; color:var(--muted);
     display:flex; flex-direction:column; align-items:center; gap:5px;
     transition:background .22s var(--ease), color .22s;
   }
-  .tab.on{background:rgba(255,255,255,.075); color:var(--bone)}
+  .tab.on{
+    background:linear-gradient(180deg, rgba(255,255,255,.125), rgba(255,255,255,.075));
+    color:var(--bone);
+    box-shadow:0 1px 0 rgba(255,255,255,.10) inset, 0 4px 12px -6px rgba(0,0,0,.7);
+  }
   .tab svg{width:17px; height:17px; stroke:currentColor; stroke-width:1.75; fill:none; stroke-linecap:round; stroke-linejoin:round}
   .tab.on svg{stroke-width:2.15}
   .tab span{font-size:10px; font-weight:540; letter-spacing:.01em}
@@ -327,7 +410,7 @@
      Schatten hebt ihn ab. Sonst geht er zwischen den Satzreihen unter. */
   .restbar{
     position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex; justify-content:center;
-    padding:30px 20px calc(20px + env(safe-area-inset-bottom));
+    padding:30px 20px calc(10px + env(safe-area-inset-bottom));
     pointer-events:none;
     background:linear-gradient(to top, var(--bg) 46%, rgba(8,9,10,.75) 76%, rgba(8,9,10,0));
   }
@@ -389,7 +472,11 @@
   }
   .sheet .inner{
     max-width:470px; width:100%; margin:0 12px calc(12px + env(safe-area-inset-bottom));
-    background:#15161A; border:1px solid var(--line-2); border-radius:26px;
+    background:linear-gradient(180deg,#1D1F24,#131418 58%);
+    border:1px solid var(--line-2); border-radius:26px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.075) inset,
+      0 -20px 60px -20px rgba(0,0,0,.95);
     padding:22px 20px 20px; animation:rise .3s var(--ease); max-height:82vh; overflow-y:auto;
   }
   .sheet h3{font-size:18px; font-weight:640; letter-spacing:-.025em; margin:0 0 4px}
@@ -504,21 +591,32 @@
   /* ---- motion ---- */
   @keyframes rise{from{transform:translateY(14px); opacity:0} to{transform:none; opacity:1}}
   @keyframes fade{from{opacity:0} to{opacity:1}}
-  @keyframes up{from{transform:translateY(11px); opacity:0} to{transform:none; opacity:1}}
-  .anim>*{animation:up .42s var(--ease) both}
+  /* Gestaffelter Aufbau beim Ansichtswechsel. Etwas mehr Weg und eine Spur
+     Massstab machen aus dem Wechsel eine Bewegung statt eines Umschaltens. */
+  @keyframes up{
+    from{transform:translateY(18px) scale(.985); opacity:0}
+    to{transform:none; opacity:1}
+  }
+  .anim>*{animation:up .5s var(--ease) both}
   .anim>*:nth-child(1){animation-delay:.01s}
-  .anim>*:nth-child(2){animation-delay:.05s}
-  .anim>*:nth-child(3){animation-delay:.09s}
-  .anim>*:nth-child(4){animation-delay:.13s}
-  .anim>*:nth-child(5){animation-delay:.17s}
-  .anim>*:nth-child(6){animation-delay:.20s}
-  .anim>*:nth-child(n+7){animation-delay:.23s}
+  .anim>*:nth-child(2){animation-delay:.06s}
+  .anim>*:nth-child(3){animation-delay:.11s}
+  .anim>*:nth-child(4){animation-delay:.16s}
+  .anim>*:nth-child(5){animation-delay:.21s}
+  .anim>*:nth-child(6){animation-delay:.25s}
+  .anim>*:nth-child(n+7){animation-delay:.29s}
+
+  /* Alles Antippbare federt. Ohne das fuehlt sich eine Web-Oberflaeche in
+     einer App sofort fremd an — native Bedienelemente antworten immer. */
+  .card.stat:active,.pill:active,.chip:active{transform:scale(.975)}
+  .card.stat,.pill,.chip{transition:transform .13s var(--ease)}
   @media (prefers-reduced-motion:reduce){*{transition:none !important; animation:none !important}}
 </style>
 </head>
 <body>
 <div id="bg"></div>
 <div id="scroll"><div id="app"></div></div>
+<div id="topfade"></div>
 <div id="tabs"></div>
 <div id="rest"></div>
 <div id="sheet"></div>
@@ -528,7 +626,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "4.1";
+const APP_VERSION = "4.7";
 
 /* ================================================================== icons */
 const I = {
@@ -1393,11 +1491,14 @@ const rgbCss = a => 'rgb('+a[0]+','+a[1]+','+a[2]+')';
 
 function silhouette(st){
   const by = muscleMap(st);
+  /* Feste Reihenfolge der Gruppen ergibt eine gleichbleibende Staffelung —
+     die Karte leuchtet immer im selben Rhythmus auf. */
+  const order = Object.keys(by);
   const paint = list => list.map(p => {
     const rgb = p[0] === "neutral" ? LV_RGB.neutral : LV_RGB[by[p[0]].level];
-    return '<path d="'+p[1]+'" fill="'+rgbCss(rgb)+'"'
-         + (p[0] === "neutral" ? ' fill-opacity=".5"' : '')
-         + '/>';
+    if (p[0] === "neutral") return '<path d="'+p[1]+'" fill="'+rgbCss(rgb)+'" fill-opacity=".5"/>';
+    const delay = (0.05 + Math.max(0, order.indexOf(p[0])) * 0.055).toFixed(3);
+    return '<path class="mg" style="--d:'+delay+'s" d="'+p[1]+'" fill="'+rgbCss(rgb)+'"/>';
   }).join("");
 
   const figure = (list, box) =>
@@ -1446,6 +1547,7 @@ function viewHeute(){
     /* Untertitel nur, wenn er etwas hinzufuegt: bei "Ganzkoerper" ist der Titel
        schon der Typ, dann stuende das Wort sonst zweimal untereinander. */
     + (recPlan && detail && detail !== recPlan.type ? '<div class="sub">'+esc(detail)+'</div>' : '')
+    + heroStats()
     + '</div>';
 
   if (!storageOk) h += '<div class="banner warn">'+I.info+'<span>Der Browser speichert gerade nichts – im privaten Modus bleibt nichts erhalten. Öffne die App normal oder sichere über Mehr › Backup.</span></div>';
@@ -1521,6 +1623,31 @@ function viewHeute(){
 }
 
 /* ---------------------------------------------------------- view: verlauf */
+/* Drei Werte unter dem Titel. Sie beantworten beim Aufschlagen der App die
+   Fragen, die man sich ohnehin zuerst stellt: Bin ich dran? Wie lief die
+   Woche? Wann war ich zuletzt da? */
+function heroStats(){
+  const wochen = weekCounts();
+  const woche = wochen[weekKey(new Date())] || 0;
+  /* sessionTime statt s.ts: Einheiten aus der Zeit vor den Zeitstempeln haben
+     nur ein Datum und wuerden sonst als "nie" gelten. */
+  const letzte = S.sessions.reduce((m, s) => Math.max(m, sessionTime(s)), 0);
+  const herTage = letzte ? Math.max(0, Math.floor((Date.now() - letzte) / 86400000)) : null;
+
+  const cell = (wert, einheit, label, farbe) =>
+    '<div class="hstat"><span class="hs-v'+(farbe ? " "+farbe : "")+'">' + wert
+    + (einheit ? '<small>'+einheit+'</small>' : '') + '</span>'
+    + '<span class="hs-l">'+label+'</span></div>';
+
+  return '<div class="herostats">'
+    + cell(streak(), streak() === 1 ? "Tag" : "Tage", "Serie", "amber")
+    + cell(woche, woche === 1 ? "Einheit" : "Einheiten", "Diese Woche", "cool")
+    + cell(herTage === null ? "—" : herTage === 0 ? "heute" : herTage,
+           herTage === null || herTage === 0 ? "" : herTage === 1 ? "Tag" : "Tage",
+           "Zuletzt", herTage === 0 ? "word" : "")
+    + '</div>';
+}
+
 function weekCounts(){
   const w = {};
   S.sessions.forEach(s => { const k = weekKey(parseDay(s.date)); w[k] = (w[k]||0) + 1; });

@@ -2,3 +2,10 @@
 files.zip
 .claude/
 debug.html
+bridgetest.html
+
+# iOS: generated copy of the web app, plus Xcode's own scratch state
+ios/Training/web/
+ios/build/
+ios/Training.xcodeproj/xcuserdata/
+ios/Training.xcodeproj/project.xcworkspace/
