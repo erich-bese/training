@@ -257,11 +257,34 @@
     font-variant-numeric:tabular-nums; letter-spacing:.02em;
   }
 
-  .g2foot{display:flex; flex-direction:column; gap:3px; margin-top:11px}
-  .g2foot > span:first-child{font-size:12.5px; color:var(--muted)}
-  /* Ein Hinweis auf fehlende Daten tritt zurueck, eine echte Prognose leuchtet. */
-  .g2prog{font-size:12px; color:var(--faint)}
-  .g2prog.reif{color:var(--amber); font-weight:600}
+  .g2foot{display:flex; flex-direction:column; gap:5px; margin-top:13px}
+  .g2row{display:flex; align-items:baseline; gap:9px; font-size:12.5px}
+  .g2lbl{color:var(--muted); flex-shrink:0}
+  .g2zt{color:var(--dim); font-weight:600; font-variant-numeric:tabular-nums; flex-shrink:0}
+  /* Eine belastbare Angabe leuchtet, eine grobe tritt zurueck. */
+  .g2when{margin-left:auto; text-align:right; color:var(--faint); white-space:nowrap}
+  .g2when.reif{color:var(--amber); font-weight:600}
+  .g2when.schneller{color:var(--lv-gruen); font-weight:600}
+  .g2when.langsamer{color:var(--red); font-weight:600}
+  .g2when.gleichbleibend{color:var(--muted)}
+  .goal2{border-radius:12px; transition:transform .13s var(--ease)}
+  .goal2:active{transform:scale(.99)}
+  .g3chart{width:100%; height:92px; display:block; margin:4px 0 18px; overflow:visible}
+  .g3chart polyline{fill:none; stroke:var(--amber); stroke-width:1.4; vector-effect:non-scaling-stroke;
+                    stroke-linecap:round; stroke-linejoin:round}
+  .g3chart circle{fill:var(--amber)}
+  .g3list{margin-bottom:18px}
+  .g3row{display:flex; align-items:baseline; gap:10px; font-size:13px; padding:9px 0 0}
+  .g3row + .g3t + .g3row{border-top:1px solid var(--line); margin-top:9px}
+  .g3d{color:var(--muted); flex-shrink:0; font-variant-numeric:tabular-nums}
+  .g3v{color:var(--bone); font-weight:620; font-variant-numeric:tabular-nums}
+  .g3k{margin-left:auto; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap}
+  .g3k.hoch{color:var(--lv-gruen)} .g3k.runter{color:var(--red)}
+  .g3t{font-size:11.5px; color:var(--faint); padding-top:3px}
+  .g2note{
+    margin-top:20px; padding-top:15px; border-top:1px solid var(--line);
+    font-size:11.5px; line-height:1.55; color:var(--faint);
+  }
 
   /* Die Leiter baut sich von links auf, Stufe fuer Stufe und Ziel fuer Ziel.
      Nur beim Ansichtswechsel — sonst zappelt sie bei jeder Eingabe. */
@@ -732,7 +755,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "6.4";
+const APP_VERSION = "6.7";
 
 /* ================================================================== icons */
 const I = {
@@ -1719,38 +1742,64 @@ function goalForecast(g, ziel, standVon){
      Ausgangspunkt. Der Abstand ist dann nicht in Kilo zu messen, sondern in
      Wiederholungen — eine Hochrechnung waere hier schlicht falsch. */
   if (!n) return {guete:guete, punkte:0, keineBasis:true};
-  if (!(proTag > 0)) return {guete:guete, punkte:n, steigend:false};
+  if (!(proTag > 0)) return {guete:guete, punkte:n, steigend:false, proTag:proTag};
 
   const tage = (ziel - stand) / proTag;
-  if (!isFinite(tage) || tage <= 0) return {guete:guete, punkte:n, steigend:true, tage:0};
-  if (tage > 3 * 365) return {guete:guete, punkte:n, steigend:true, zuWeit:true};
-  return {guete:guete, punkte:n, steigend:true, tage:Math.round(tage),
+  if (!isFinite(tage) || tage <= 0) return {guete:guete, punkte:n, steigend:true, proTag:proTag, tage:0};
+  if (tage > 3 * 365) return {guete:guete, punkte:n, steigend:true, proTag:proTag, zuWeit:true};
+  return {guete:guete, punkte:n, steigend:true, proTag:proTag, tage:Math.round(tage),
           datum:new Date(Date.now() + tage * 86400000)};
 }
 
-/* Ein Satz dazu. Das erste Wort sagt, wie belastbar die Zahl ist. */
-function goalForecastText(g, ziel, standVon){
+/* Kurze Zeitangabe fuer die Fusszeile. Wie belastbar sie ist, sagt die
+   Farbe — der Zusatz stuende sonst zweimal untereinander. */
+function goalWhen(g, ziel, standVon){
   const f = goalForecast(g, ziel, standVon);
-  const vorsatz = f.guete === "prognose" ? "Prognose" : f.guete === "schaetzung" ? "Schätzung" : "Grob geschätzt";
+  const reif = f.guete !== "grob";
   if (f.keineBasis) {
-    return g.kind === "load"
-      ? "Noch kein Satz mit " + goalReps(g) + " Wdh."
-      : "Noch keine Einheit erfasst";
+    return {text: g.kind === "load" ? "erst ab " + goalReps(g) + " Wdh." : "noch keine Daten", reif:false};
   }
-  if (!f.steigend) return "Noch kein messbarer Anstieg";
-  if (f.zuWeit) return vorsatz + ": über drei Jahre";
-  if (f.tage <= 0) return "Etappe rechnerisch erreicht";
+  if (!f.steigend) return {text:"kein Anstieg messbar", reif:false};
+  if (f.zuWeit) return {text:"über drei Jahre", reif:reif};
+  if (f.tage <= 0) return {text:"erreicht", reif:reif};
   if (f.tage < 70) { const w = Math.max(1, Math.round(f.tage / 7));
-    return vorsatz + ": in " + w + (w === 1 ? " Woche" : " Wochen"); }
-  return vorsatz + ": " + MONATE[f.datum.getMonth()] + " " + f.datum.getFullYear();
+    return {text:"in " + w + (w === 1 ? " Woche" : " Wochen"), reif:reif}; }
+  return {text:MONATE[f.datum.getMonth()] + " " + f.datum.getFullYear(), reif:reif};
 }
 
-/* Hauptziele.
-   Frueher: ein Balken zur naechsten Etappe und zwei Textzeilen. Damit war der
-   Weg unsichtbar — dass hinter "Etappe 8" noch 12, 16 und 20 kommen, stand
-   nur als Wort da. Jetzt ist die Leiter das Bauteil: eine Spur je Etappe,
-   erledigte gefuellt, die laufende angefangen, kommende dunkel. Man sieht auf
-   einen Blick, wo man steht und wie weit es noch ist. */
+/* Tempo: wie schnell es auf das Ziel zugeht, und ob das zuletzt schneller
+   oder langsamer wurde. Die Richtung ist der Teil, den man beeinflussen kann
+   — sie faellt beim Auslassen sofort ab und zieht bei Serien wieder an.
+   Verglichen wird die zweite Haelfte der Reihe mit der ersten; unter vier
+   Punkten gibt es dafuer keine Grundlage. */
+function goalPace(g, standVon){
+  const f = goalForecast(g, g.steps[g.steps.length-1], standVon);
+  if (f.keineBasis || !(f.proTag > 0)) return null;
+  const proWoche = f.proTag * 7;
+  const text = (g.kind === "reps" ? (Math.round(proWoche * 10) / 10) : kg(Math.round(proWoche * 10) / 10))
+             + " " + g.unit + " / Woche";
+
+  let richtung = null;
+  const p = goalSeries(g);
+  if (p.length >= 4) {
+    const mitte = Math.floor(p.length / 2);
+    const steig = teil => {
+      const n = teil.length;
+      if (n < 2) return null;
+      const x = teil.map(q => q.t / 86400000), y = teil.map(q => q.wert);
+      const mx = x.reduce((a,b)=>a+b,0)/n, my = y.reduce((a,b)=>a+b,0)/n;
+      let z = 0, nn = 0;
+      for (let i = 0; i < n; i++) { z += (x[i]-mx)*(y[i]-my); nn += (x[i]-mx)*(x[i]-mx); }
+      return nn ? z/nn : null;
+    };
+    const frueh = steig(p.slice(0, mitte + 1)), spaet = steig(p.slice(mitte));
+    if (frueh !== null && spaet !== null && frueh > 0) {
+      richtung = spaet > frueh * 1.1 ? "schneller" : spaet < frueh * 0.9 ? "langsamer" : "gleichbleibend";
+    }
+  }
+  return {text:text, richtung:richtung};
+}
+
 function goalsCard(pr){
   return '<div class="card">' + GOALS.map((g, gi) => {
     const st = goalStep(g, pr);
@@ -1768,24 +1817,33 @@ function goalsCard(pr){
         + '<i style="width:'+(anteil * 100).toFixed(1)+'%;--d:'+verzoegerung+'s"></i></div>';
     }).join("");
 
+    const tempo = goalPace(g, st.value);
     const marken = g.steps.map(s => '<span>'+s+'</span>').join("");
-    const prognose = goalForecastText(g, st.target, st.value);
-    /* Eine echte Prognose ist ein Ergebnis und darf leuchten. Ein Hinweis,
-       dass noch Daten fehlen, ist Beiwerk und tritt zurueck. */
-    const reif = goalForecast(g, st.target, st.value).guete !== "grob";
+    /* Je Zeile: was, wie viel, wann. Eine belastbare Angabe leuchtet, eine
+       grobe tritt zurueck. */
+    const zeile = (was, ziel) => {
+      const w = goalWhen(g, ziel, st.value);
+      return '<div class="g2row"><span class="g2lbl">'+was+'</span>'
+        + '<span class="g2zt">'+ziel+' '+g.unit
+        + (g.kind === "load" ? ' × '+goalReps(g)+' Wdh.' : '')+'</span>'
+        + '<span class="g2when'+(w.reif ? " reif" : "")+'">'+w.text+'</span></div>';
+    };
 
-    return '<div class="goal2">'
+    return '<div class="goal2" data-a="goalzoom" data-id="'+gi+'">'
       + '<div class="g2head"><span class="g2name">'+g.label+'</span>'
       + '<span class="g2val'+(st.done ? " amber" : "")+'">'+kg(wert)+'<small>'+g.unit+'</small></span></div>'
       + '<div class="g2track">'+spuren+'</div>'
       + '<div class="g2marks">'+marken+'</div>'
-      + '<div class="g2foot">'
-      + (st.done ? '<span class="amber">Endziel erreicht</span>'
-                 : '<span>Nächste Etappe '+st.target+' '+g.unit
-                     + (g.kind === "load" ? ' × '+goalReps(g)+' Wdh.' : '')+'</span>'
-                   + '<span class="g2prog'+(reif ? " reif" : "")+'">'+prognose+'</span>')
+      + '<div class="g2foot">' + zeile('Nächste Etappe', st.target, st.target)
+      + (st.final !== st.target ? zeile('Endziel', st.final, st.final) : '')
+      + (tempo ? '<div class="g2row"><span class="g2lbl">Tempo</span>'
+                 + '<span class="g2zt">'+tempo.text+'</span>'
+                 + (tempo.richtung ? '<span class="g2when '+tempo.richtung+'">'+tempo.richtung+'</span>' : '')
+                 + '</div>' : '')
       + '</div></div>';
-  }).join("") + '</div>';
+  }).join("")
+  + '<div class="g2note">Zeitangaben sind Schätzungen und werden mit jeder '
+  + 'Einheit genauer. Grau heißt: noch wenig Verlauf.</div></div>';
 }
 
 /* ------------------------------------------------------------ view: heute */
@@ -2805,6 +2863,66 @@ function numSheet(o){
 
 /* Die Zeichnung in Ruhe ansehen. Auf 40 Pixel in einer Liste ist von der
    Bewegung wenig zu erkennen; gross laeuft sie sichtbar durch. */
+/* Verlauf eines Ziels zum Hineinschauen: wann ging es hoch, wann zurueck,
+   wo war das Tempo hoch. Die Kurve zeigt den Stand, die Liste jeden Schritt
+   mit Veraenderung und Tempo im jeweiligen Abschnitt. */
+function goalSheet(gi){
+  const g = GOALS[+gi];
+  if (!g) return;
+  const p = goalSeries(g);
+  const kopf = '<h3>'+esc(g.label)+'</h3><div class="sh-sub">'
+    + (g.kind === "load" ? 'Schwerste Last mit '+goalReps(g)+' Wiederholungen'
+                         : 'Längster Satz ohne Zusatzgewicht')
+    + '</div>';
+
+  if (p.length < 2) {
+    openSheet(kopf + '<div class="lead" style="margin-bottom:18px">'
+      + (p.length ? 'Bisher ein Eintrag. Ab dem zweiten zeigt sich hier der Verlauf.'
+                  : 'Noch kein Satz, der den Standard erfüllt.')
+      + '</div><button class="btn ghost" data-a="sheetclose">Schließen</button>', {});
+    return;
+  }
+
+  /* Kurve. Der Wertebereich beginnt bei der ersten Etappe darunter, damit
+     kleine Schritte nicht als Sprung ueber die halbe Hoehe erscheinen. */
+  const werte = p.map(q => q.wert);
+  const oben = Math.max.apply(null, werte), unten = Math.min.apply(null, werte);
+  const spanneW = Math.max(1, oben - unten);
+  const t0 = p[0].t, spanneT = Math.max(1, p[p.length-1].t - t0);
+  const punkte = p.map(q => {
+    const x = 4 + (q.t - t0) / spanneT * 92;
+    const y = 40 - (q.wert - unten) / spanneW * 32;
+    return x.toFixed(2) + "," + y.toFixed(2);
+  });
+  const kurve = '<svg class="g3chart" viewBox="0 0 100 46" preserveAspectRatio="none">'
+    + '<polyline points="'+punkte.join(" ")+'"/>'
+    + p.map((q, i) => { const c = punkte[i].split(",");
+        return '<circle cx="'+c[0]+'" cy="'+c[1]+'" r="1.5"/>'; }).join("")
+    + '</svg>';
+
+  /* Liste rueckwaerts: der letzte Schritt zuerst. */
+  const zeilen = p.map((q, i) => {
+    const vor = i ? p[i-1] : null;
+    const delta = vor ? q.wert - vor.wert : null;
+    const tage = vor ? Math.max(1, Math.round((q.t - vor.t) / 86400000)) : null;
+    const tempo = (delta !== null && tage) ? (delta / tage * 7) : null;
+    const richtung = delta === null ? "" : delta > 0 ? "hoch" : delta < 0 ? "runter" : "gleich";
+    return '<div class="g3row">'
+      + '<span class="g3d">'+new Date(q.t).toLocaleDateString("de-DE",{day:"2-digit",month:"short"})+'</span>'
+      + '<span class="g3v">'+kg(q.wert)+' '+g.unit+'</span>'
+      + '<span class="g3k '+richtung+'">'
+      + (delta === null ? 'Start'
+         : (delta > 0 ? '+' : '') + kg(delta) + ' in ' + tage + (tage === 1 ? ' Tag' : ' Tagen'))
+      + '</span></div>'
+      + (tempo !== null && tempo !== 0
+         ? '<div class="g3t">Tempo ' + (tempo > 0 ? '+' : '') + kg(Math.round(tempo*10)/10)
+           + ' ' + g.unit + ' / Woche</div>' : '');
+  }).reverse().join("");
+
+  openSheet(kopf + kurve + '<div class="g3list">' + zeilen + '</div>'
+    + '<button class="btn ghost" data-a="sheetclose">Schließen</button>', {});
+}
+
 function artSheet(exId){
   const art = exArt(exId, 232, 306);
   if (!art) return;
@@ -3155,6 +3273,7 @@ document.addEventListener("click", ev => {
   /* ---- sheet plumbing ---- */
   if (a === "sheetclose") { closeSheet(); return; }
   if (a === "artzoom") { buzz(); artSheet(id); return; }
+  if (a === "goalzoom") { buzz(); goalSheet(id); return; }
   if (a === "nfq") {
     const f = document.getElementById("nf");
     const v = Math.max(0, (parseFloat(String(f.value).replace(",", ".")) || 0) + d);
