@@ -268,9 +268,6 @@
   .g2when.langsamer{color:var(--red); font-weight:600}
   .g2when.gleichbleibend{color:var(--muted)}
   /* Widerspruch zwischen Ziel und Plan — der gehoert nicht weggegraut. */
-  .g2seg.ueber{background:rgba(255,255,255,.03); border:1px dashed rgba(255,255,255,.14)}
-  .g2geraet{margin-top:2px}
-  .g2geraet span{font-size:11.5px; color:var(--muted); line-height:1.45}
   .g2warn{margin-top:2px}
   .g2warn span{
     font-size:11.5px; color:var(--red); line-height:1.45;
@@ -764,7 +761,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "6.9";
+const APP_VERSION = "7.0";
 
 /* ================================================================== icons */
 const I = {
@@ -817,31 +814,31 @@ const G = {
 /* One library, referenced by plans. `inc` is the smallest step the equipment
    allows: the Gym Monster stack moves in 1 kg, belt plates in 1.25 kg. */
 const EX = {
-  pullup:    {name:"Klimmzüge",              pat:"vpull",   bw:true,  inc:1.25},
-  row:       {name:"Rudern",                 pat:"row",               inc:1},
-  row1:      {name:"Einarmiges Rudern",      pat:"row1",              inc:1},
-  facepull:  {name:"Face Pulls",             pat:"rear",              inc:1},
-  reardelt:  {name:"Rear Delt am Seil",      pat:"rear",              inc:1},
-  curl:      {name:"Bizepscurls",            pat:"curl",              inc:1},
-  hammer:    {name:"Hammer Curls",           pat:"curl",              inc:1},
-  bench:     {name:"Bankdrücken",            pat:"bench",             inc:1},
-  incline:   {name:"Schrägbankdrücken",      pat:"bench",             inc:1},
-  dips:      {name:"Dips",                   pat:"dip",     bw:true,  inc:1.25},
-  ohp:       {name:"Schulterdrücken",        pat:"ohp",               inc:1},
-  lateral:   {name:"Seitheben",              pat:"lat",               inc:1},
-  triceps:   {name:"Trizeps am Seil",        pat:"tri",               inc:1},
-  squat:     {name:"Kniebeugen schwer",      pat:"squat",             inc:1},
-  squat_light:{name:"Kniebeugen leicht",     pat:"squat",             inc:1},
-  deadlift:  {name:"Kreuzheben schwer",      pat:"hinge",             inc:1},
-  dl_light:  {name:"Kreuzheben leicht",      pat:"hinge",             inc:1},
-  rdl:       {name:"Rumänisches Kreuzheben", pat:"hinge",             inc:1},
-  bss:       {name:"Bulgarian Split Squats", pat:"split",             inc:1},
-  legcurl:   {name:"Beinbeuger",             pat:"legcurl",           inc:1},
-  legext:    {name:"Beinstrecker",           pat:"legcurl",           inc:1},
-  calf:      {name:"Wadenheben",             pat:"calf",              inc:1},
-  abs:       {name:"Bauch",                  pat:"abs",     bw:true,  inc:1.25},
-  shrug:     {name:"Shrugs",                 pat:"row",               inc:1},
-  pushdown:  {name:"Trizepsdrücken",         pat:"tri",               inc:1}
+  pullup:    {name:"Klimmzüge",              pat:"vpull",   bw:true,  inc:1.25, rest:180},
+  row:       {name:"Rudern",                 pat:"row",               inc:1, rest:120},
+  row1:      {name:"Einarmiges Rudern",      pat:"row1",              inc:1, rest:120},
+  facepull:  {name:"Face Pulls",             pat:"rear",              inc:1, rest:60},
+  reardelt:  {name:"Rear Delt am Seil",      pat:"rear",              inc:1, rest:60},
+  curl:      {name:"Bizepscurls",            pat:"curl",              inc:1, rest:75},
+  hammer:    {name:"Hammer Curls",           pat:"curl",              inc:1, rest:75},
+  bench:     {name:"Bankdrücken",            pat:"bench",             inc:1, rest:180},
+  incline:   {name:"Schrägbankdrücken",      pat:"bench",             inc:1, rest:180},
+  dips:      {name:"Dips",                   pat:"dip",     bw:true,  inc:1.25, rest:180},
+  ohp:       {name:"Schulterdrücken",        pat:"ohp",               inc:1, rest:150},
+  lateral:   {name:"Seitheben",              pat:"lat",               inc:1, rest:60},
+  triceps:   {name:"Trizeps am Seil",        pat:"tri",               inc:1, rest:75},
+  squat:     {name:"Kniebeugen schwer",      pat:"squat",             inc:1, rest:180},
+  squat_light:{name:"Kniebeugen leicht",     pat:"squat",             inc:1, rest:180},
+  deadlift:  {name:"Kreuzheben schwer",      pat:"hinge",             inc:1, rest:180},
+  dl_light:  {name:"Kreuzheben leicht",      pat:"hinge",             inc:1, rest:180},
+  rdl:       {name:"Rumänisches Kreuzheben", pat:"hinge",             inc:1, rest:180},
+  bss:       {name:"Bulgarian Split Squats", pat:"split",             inc:1, rest:120},
+  legcurl:   {name:"Beinbeuger",             pat:"legcurl",           inc:1, rest:75},
+  legext:    {name:"Beinstrecker",           pat:"legcurl",           inc:1, rest:75},
+  calf:      {name:"Wadenheben",             pat:"calf",              inc:1, rest:60},
+  abs:       {name:"Bauch",                  pat:"abs",     bw:true,  inc:1.25, rest:45},
+  shrug:     {name:"Shrugs",                 pat:"row",               inc:1, rest:90},
+  pushdown:  {name:"Trizepsdrücken",         pat:"tri",               inc:1, rest:75}
 };
 
 /* Uebungszeichnungen aus Everkinetic, CC BY-SA 4.0.
@@ -962,11 +959,11 @@ const GOALS = [
    steps:[10,20,30,40,50]},
   {label:"Dips mit Zusatz",     unit:"kg",   kind:"load", ex:"dips",     reps:10,
    steps:[5,15,25,40,50]},
-  {label:"Bankdrücken",         unit:"kg",   kind:"load", ex:"bench",    reps:5, geraet:100,
+  {label:"Bankdrücken",         unit:"kg",   kind:"load", ex:"bench",    reps:5,
    steps:[60,80,100,120,140]},
-  {label:"Kniebeuge",           unit:"kg",   kind:"load", ex:["squat","squat_light"], reps:5, geraet:100,
+  {label:"Kniebeuge",           unit:"kg",   kind:"load", ex:["squat","squat_light"], reps:5,
    steps:[50,80,110,140,170]},
-  {label:"Kreuzheben",          unit:"kg",   kind:"load", ex:["deadlift","dl_light"], reps:5, geraet:100,
+  {label:"Kreuzheben",          unit:"kg",   kind:"load", ex:["deadlift","dl_light"], reps:5,
    steps:[90,120,150,180,210]}
 ];
 
@@ -1098,6 +1095,11 @@ const incOf = id => {
   return (EX[id] || {}).inc || 1;
 };
 const isBw = id => !!(EX[id] || {}).bw;
+/* Pause je Uebung. Eine Zahl fuer alles ist bei Seitheben zu lang und bei
+   Kreuzheben zu kurz: schwere Grunduebungen brauchen das Nervensystem
+   zurueck, Isolation nur den Muskel. Die Einstellung bleibt als Rueckfall
+   und als Regler fuer alles, was keine eigene Angabe hat. */
+const restFor = id => (EX[id] || {}).rest || S.settings.rest || 120;
 
 /* =============================================================== analysis */
 /* Load actually moved by one rep, in kg. Per-side entries count both sides;
@@ -1122,7 +1124,7 @@ function prsFrom(sessions){
     const w = e.perSide ? e.weight * 2 : e.weight;
     if (w > c.weight) c.weight = w;
     if (best > c.reps) c.reps = best;
-    if (e.bw && e.weight === 0 && best > c.repsAtBw) c.repsAtBw = best;
+    if (e.bw && best > c.repsAtBw) c.repsAtBw = best;
     c.e1rm = Math.max(c.e1rm, e1rm(e));
     pr[e.id] = c;
   }));
@@ -1674,8 +1676,7 @@ function goalSeries(g){
   const punkte = [];
   S.sessions.forEach(s => s.entries.forEach(e => {
     if (goalEx(g).indexOf(e.id) < 0 || !e.reps.length) return;
-    /* Strikte Wiederholungen zaehlen nur ohne Zusatzgewicht. */
-    if (g.kind === "reps" && e.weight) return;
+    /* Zusatzgewicht macht den Satz schwerer, nicht leichter — er zaehlt mit. */
     /* Lastziele: nur Saetze, die die geforderte Laenge erreicht haben. */
     if (g.kind === "load" && Math.max.apply(null, e.reps) < goalReps(g)) return;
     punkte.push({
@@ -1845,11 +1846,7 @@ function goalsCard(pr){
       const laufend = anteil > 0 && anteil < 1;
       vorher = stufe;
       const verzoegerung = (gi * 0.09 + si * 0.07).toFixed(2);
-      /* Ueber der Belastungsgrenze des Geraets: die Stufe bleibt stehen, wird
-         aber als das gekennzeichnet, was sie ist — nur mit anderem Gerät. */
-      const ueber = g.geraet && stufe > g.geraet;
-      return '<div class="g2seg'+(anteil >= 1 ? " voll" : laufend ? " jetzt" : "")
-             +(ueber ? " ueber" : "")+'">'
+      return '<div class="g2seg'+(anteil >= 1 ? " voll" : laufend ? " jetzt" : "")+'">'
         + '<i style="width:'+(anteil * 100).toFixed(1)+'%;--d:'+verzoegerung+'s"></i></div>';
     }).join("");
 
@@ -1878,10 +1875,6 @@ function goalsCard(pr){
                  + (tempo.richtung ? '<span class="g2when '+tempo.richtung+'">'+tempo.richtung+'</span>' : '')
                  + '</div>' : '')
       + (passt ? '<div class="g2row g2warn"><span>'+passt.text+'</span></div>' : '')
-      + (g.geraet && st.final > g.geraet
-          ? '<div class="g2row g2geraet"><span>Ab '+g.geraet+' kg endet das Gym Monster '
-            + '(100 kg gesamt, 50 je Arm) — die letzten Stufen brauchen eine Langhantel.</span></div>'
-          : '')
       + '</div></div>';
   }).join("")
   + '<div class="g2note">Zeitangaben sind Schätzungen und werden mit jeder '
@@ -2741,7 +2734,7 @@ function renderRest(){
   if (!S.active || !S.rest) { restEl.innerHTML = ""; return; }
   const left = restLeft();
   const over = left <= 0;
-  const totalSec = S.settings.rest || 1;
+  const totalSec = S.rest.total || S.settings.rest || 1;
   const frac = Math.max(0, Math.min(1, left / totalSec));
   const m = Math.floor(left/60), sec = String(left%60).padStart(2,"0");
 
@@ -2769,8 +2762,9 @@ function renderRest(){
   const p = document.getElementById("restprog");
   if (p) p.style.width = (frac*100).toFixed(1) + "%";
 }
-function startRest(){
-  S.rest = {endsAt: Date.now() + (S.settings.rest || 120) * 1000};
+function startRest(exId){
+  const dauer = exId ? restFor(exId) : (S.settings.rest || 120);
+  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer};
   restDone = false;
   save();
   renderRest();
@@ -2914,7 +2908,7 @@ function goalSheet(gi){
   const p = goalSeries(g);
   const kopf = '<h3>'+esc(g.label)+'</h3><div class="sh-sub">'
     + (g.kind === "load" ? 'Schwerste Last mit '+goalReps(g)+' Wiederholungen'
-                         : 'Längster Satz ohne Zusatzgewicht')
+                         : 'Längster Satz am Stück, Zusatzgewicht zählt mit')
     + '</div>';
 
   if (p.length < 2) {
@@ -3673,7 +3667,7 @@ document.addEventListener("click", ev => {
       row.classList.toggle("done", s.done);
       row.querySelector('[data-a="log"]').classList.toggle("on", s.done);
     }
-    if (s.done) startRest();
+    if (s.done) startRest(id);
     updateSub(cfg); updateCount(); updateDuel(); return;
   }
   if (a === "addset") {
