@@ -482,6 +482,24 @@
       var(--bg) 34%, rgba(8,9,10,.74) 70%, rgba(8,9,10,0));
   }
 
+  /* Kompakte Muskelkarte fuer die Startseite: dort zaehlt der schnelle Blick,
+     die grosse Ansicht bleibt der Auswertung vorbehalten. */
+  .bodies.klein .body{max-width:118px}
+  .sessbody{padding:15px 19px 13px}
+  .sessbody .bodies .cap{display:none}
+  .bodies.klein .cap{margin-top:7px; font-size:9.5px}
+
+  /* ---- Planliste ---- */
+  .planrow{display:flex; align-items:center; gap:13px; padding:11px 0}
+  .planrow.tr{border-top:1px solid var(--line)}
+  .planrow .body{flex:1; min-width:0}
+  .planrow .nm{font-size:14.5px; font-weight:600; letter-spacing:-.012em}
+  .planrow .sc{color:var(--muted); font-size:12px; margin-top:3px}
+  .pdur{text-align:right; flex-shrink:0}
+  .pdur .num{font-size:21px; font-weight:700; letter-spacing:-.04em; font-variant-numeric:tabular-nums}
+  .pdur small{font-size:11px; color:var(--muted); margin-left:3px}
+  .pdur .foot{font-size:10.5px; color:var(--faint); margin-top:2px}
+
   /* ---- Wochenvorschau ---- */
   /* Sieben Spalten sind eng. Deshalb keine Kaestchen: nur Tag, Punkt, Name.
      Der Rahmen um jede Zelle hat die Zeile frueher zusammengedrueckt, ohne
@@ -761,7 +779,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "7.0";
+const APP_VERSION = "7.2";
 
 /* ================================================================== icons */
 const I = {
@@ -782,6 +800,7 @@ const I = {
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   bolt:'<svg viewBox="0 0 24 24"><path d="M13 2.5L4.5 13.5H11l-1 8L18.5 10H12z"/></svg>',
   swap:'<svg viewBox="0 0 24 24"><path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/></svg>',
+  list:'<svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1.1" fill="currentColor" stroke="none"/><circle cx="3.5" cy="12" r="1.1" fill="currentColor" stroke="none"/><circle cx="3.5" cy="18" r="1.1" fill="currentColor" stroke="none"/></svg>',
   dots:'<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>',
   clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
   trash:'<svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12.5h9.4L17.5 7"/></svg>',
@@ -2033,6 +2052,25 @@ function silhouette(st){
     + '</div></details>';
 }
 
+/* Geschaetzte Dauer eines Plans in Minuten.
+   Je Satz: rund 20 Sekunden Vorbereitung plus drei Sekunden je Wiederholung,
+   dazu die Pause nach jedem Satz ausser dem letzten der Einheit. Der Wert ist
+   ein Sollwert, kein Mittel aus dem Verlauf — der Verlauf enthaelt genau die
+   Handypausen, die hier vermieden werden sollen. */
+function planDuration(pid){
+  const pl = planOf(pid);
+  if (!pl) return 0;
+  let sek = 0, saetze = 0;
+  (pl.ex || []).forEach(e => {
+    const n = Math.max(1, +e.sets || 3);
+    const wdh = e.total ? Math.round((e.total[0] + e.total[1]) / 2 / n) : ((+e.min || 8) + (+e.max || 10)) / 2;
+    sek += n * (20 + wdh * 3) + n * restFor(e.id);
+    saetze += n;
+  });
+  sek -= restFor((pl.ex[pl.ex.length-1] || {}).id);      /* nach dem letzten Satz keine Pause */
+  return {minuten: Math.round(sek / 60), saetze: saetze};
+}
+
 function viewHeute(){
   const now = new Date();
   const rec = recommend();
@@ -2077,28 +2115,8 @@ function viewHeute(){
         : '<button class="pill" data-a="formask"><i class="dotlv" style="background:var(--lv-none)"></i>Noch nicht erfasst</button>')
     + '</div></div>';
 
-  /* Muskelgruppen-Ampel */
-  h += '<div class="stack"><div class="eyebrow"><span>Beanspruchte Muskelgruppen</span></div>'
-    + '<div class="card">' + silhouette(rec.state) + '</div></div>';
-
-  /* Wochenvorschau — nur wenn ueberhaupt etwas vorgeschlagen wird */
-  const vorschau = weekAhead();
-  if (vorschau.some(t => t.pid)) {
-    h += '<div class="stack"><div class="eyebrow"><span>Nächste sieben Tage</span>'
-      + '<span class="faint">Vorschau</span></div><div class="card"><div class="week7">'
-      + vorschau.map((t, i) => {
-          const klasse = t.type === "Pull" ? "pull" : t.type === "Push" ? "push"
-                       : t.type === "Beine" ? "beine" : "frei";
-          return '<div class="w7d '+klasse+(i === 0 ? " heute" : "")+'">'
-            + '<span class="w7n">'+(i === 0 ? "Heute" : DAYS_SHORT[new Date(t.ts).getDay()])+'</span>'
-            + '<i></i><span class="w7p">'+(t.type || (t.erledigt ? "Fertig" : "Frei"))+'</span></div>';
-        }).join("")
-      + '</div><div class="note" style="margin-top:13px">'
-      + 'Gerechnet unter der Annahme, dass du dem Vorschlag folgst — jede Einheit '
-      + 'verschiebt die folgenden. Tagesform und Lust schlagen die Rechnung.'
-      + '</div></div></div>';
-  }
-
+  /* Der Weg ins Training steht vor der Auswertung: erst handeln, dann
+     nachsehen. Frueher stand er ganz unten, hinter Muskelkarte und Vorschau. */
   /* Die drei Wege in eine Einheit */
   h += '<div class="stack">'
     + '<button class="btn" data-a="choose">Training auswählen</button>'
@@ -2106,6 +2124,12 @@ function viewHeute(){
     + '<button class="btn ghost" data-a="restask">Pause / Regeneration</button>'
     + (doneToday ? '<div class="note" style="padding:12px 4px 0">Heute ist schon etwas eingetragen. Eine zweite Einheit ist trotzdem möglich.</div>' : '')
     + '</div>';
+
+  /* Muskelgruppen-Ampel, kompakt — die volle Hoehe zweier Figuren hat die
+     Startseite frueher zur Haelfte gefuellt. */
+  h += '<div class="stack"><div class="eyebrow"><span>Beanspruchte Muskelgruppen</span>'
+    + '<span class="faint">' + rec.state.filter(x => x.level === "rot").length + ' belastet</span></div>'
+    + '<div class="card"><div class="bodies klein">' + silhouette(rec.state) + '</div></div></div>';
 
   /* Die Daten liegen nur auf diesem Geraet. Ohne Erinnerung faellt ein fehlendes
      Backup erst auf, wenn es zu spaet ist. */
@@ -2137,16 +2161,52 @@ function viewHeute(){
       + '</div>';
   }
 
-  const wk = weekCounts();
-  const thisWeek = wk[weekKey(new Date())] || 0;
-  h += '<div class="grid2 stack">'
-    + '<div class="card stat"><div class="lbl">'+I.flame+' Serie</div><span class="big num">'+streak()+'</span>'
-    + '<span class="unit">Tage</span><div class="foot">am Ball geblieben</div></div>'
-    + '<div class="card stat"><div class="lbl">'+I.cal+' Diese Woche</div><span class="big num">'+thisWeek+'</span>'
-    + '<span class="unit">Einheiten</span><div class="foot">'+S.sessions.length+' insgesamt</div></div>'
-    + '</div>';
+  return h;
+}
 
-  h += '<div class="stack"><div class="eyebrow"><span>Hauptziele</span><span class="faint">Etappen</span></div>' + goalsCard(pr) + '</div>';
+/* ------------------------------------------------------------- view: plan */
+/* Alles, was die Einheiten vorbereitet: was als Naechstes ansteht, woraus die
+   Plaene bestehen, wie lange sie dauern. Frueher lag das verstreut auf der
+   Startseite und unter "Mehr". */
+function viewPlan(){
+  let h = '<h1>Plan</h1>';
+
+  /* Wochenvorschau — nur wenn ueberhaupt etwas vorgeschlagen wird */
+  const vorschau = weekAhead();
+  if (vorschau.some(t => t.pid)) {
+    h += '<div class="stack"><div class="eyebrow"><span>Nächste sieben Tage</span>'
+      + '<span class="faint">Vorschau</span></div><div class="card"><div class="week7">'
+      + vorschau.map((t, i) => {
+          const klasse = t.type === "Pull" ? "pull" : t.type === "Push" ? "push"
+                       : t.type === "Beine" ? "beine" : "frei";
+          return '<div class="w7d '+klasse+(i === 0 ? " heute" : "")+'">'
+            + '<span class="w7n">'+(i === 0 ? "Heute" : DAYS_SHORT[new Date(t.ts).getDay()])+'</span>'
+            + '<i></i><span class="w7p">'+(t.type || (t.erledigt ? "Fertig" : "Frei"))+'</span></div>';
+        }).join("")
+      + '</div><div class="note" style="margin-top:13px">'
+      + 'Gerechnet unter der Annahme, dass du dem Vorschlag folgst — jede Einheit '
+      + 'verschiebt die folgenden. Tagesform und Lust schlagen die Rechnung.'
+      + '</div></div></div>';
+  }
+
+
+  h += '<div class="stack"><div class="eyebrow"><span>Deine Pläne</span>'
+    + '<span class="faint">Dauer · Sätze</span></div><div class="card">'
+    + Object.keys(plans()).map((pid, i) => {
+        const pl = planOf(pid), d = planDuration(pid);
+        return '<div class="planrow'+(i ? " tr" : "")+'" data-a="planedit" data-id="'+pid+'">'
+          + exIcon(pl.ex[0].id, 34, 45)
+          + '<div class="body"><div class="nm">'+esc(pl.title)+'</div>'
+          + '<div class="sc">'+pl.ex.length+' Übungen · zuletzt '+lastPlanLabel(pid)+'</div></div>'
+          + '<div class="pdur"><span class="num">'+d.minuten+'</span><small>min</small>'
+          + '<div class="foot">'+d.saetze+' Sätze</div></div></div>';
+      }).join("")
+    + '</div><div class="note" style="margin-top:13px">'
+    + 'Die Dauer ist ein Sollwert: Satzzeit plus die Pausen der Übungen. '
+    + 'Wer zwischendurch am Handy hängt, braucht länger — genau das ist der Punkt.'
+    + '</div></div>';
+
+  h += '<div class="stack"><button class="btn ghost" data-a="planlist">Trainingsplan bearbeiten</button></div>';
   return h;
 }
 
@@ -2459,6 +2519,8 @@ function viewExercise(exId){
 /* ---------------------------------------------------------- view: ziele */
 function viewZiele(){
   const pr = prsFrom(S.sessions);
+  const wkNow = weekCounts();
+  const dieseWoche = wkNow[weekKey(new Date())] || 0;
   const wk = weekCounts();
   const keys = Object.keys(wk).sort().slice(-8);
   const maxW = Math.max.apply(null, [5].concat(keys.map(k => wk[k])));
@@ -2475,6 +2537,12 @@ function viewZiele(){
   ];
 
   let h = '<h1>Fortschritt</h1>'
+    + '<div class="grid2 stack">'
+    + '<div class="card stat"><div class="lbl">'+I.flame+' Serie</div><span class="big num">'+streak()+'</span>'
+    + '<span class="unit">Tage</span><div class="foot">am Ball geblieben</div></div>'
+    + '<div class="card stat"><div class="lbl">'+I.cal+' Diese Woche</div><span class="big num">'+dieseWoche+'</span>'
+    + '<span class="unit">Einheiten</span><div class="foot">'+S.sessions.length+' insgesamt</div></div>'
+    + '</div>'
     + '<div class="stack"><div class="eyebrow"><span>Hauptziele</span><span class="faint">Etappen</span></div>' + goalsCard(pr) + '</div>';
 
   h += '<div class="stack"><div class="eyebrow"><span>Einheiten pro Kalenderwoche</span><span class="faint">Ziel 5</span></div>'
@@ -2598,6 +2666,48 @@ function viewPlanEdit(id){
 }
 
 /* -------------------------------------------------------- view: session */
+/* Was in dieser Einheit bisher gearbeitet wurde, je Muskelgruppe — gemessen
+   an dem, was der ganze Plan bringen wuerde. Damit fuellt sich die Figur ueber
+   die Einheit hinweg von grau nach rot: man sieht die eigene Arbeit entstehen,
+   statt nur Haken zu setzen. */
+function sessionBodyState(){
+  const a = S.active, plan = planOf(a.plan);
+  const best = prsFrom(S.sessions);
+  const mach = auswahl => ({
+    kind:"lift", effort:3,
+    entries: (plan.ex || []).map(e => {
+      const c = a.cfg[e.id] || {};
+      const saetze = (a.sets[e.id] || []).filter(auswahl);
+      return {id:e.id, bw:isBw(e.id), weight:a.weights[e.id], perSide:!!c.perSide,
+              reps:saetze.map(s => s.reps)};
+    })
+  });
+  const jetzt = sessionLoad(mach(s => s.done), best);
+  const ganz  = sessionLoad(mach(() => true), best);
+
+  return MUSCLES.map(m => {
+    const soll = ganz[m] || 0;
+    const ist = jetzt[m] || 0;
+    const ratio = soll ? Math.min(1, ist / soll) : 0;
+    return {id:m, label:MUSCLE_LABEL[m], open:ist, ratio:ratio,
+            /* Was der Plan nicht trifft, bleibt neutral — sonst faerbte sich
+               die halbe Figur gruen, obwohl dort gar nichts vorgesehen ist. */
+            level: !soll ? "neutral" : ratio >= 0.66 ? "rot" : ratio >= 0.33 ? "gelb" : "gruen",
+            last:null};
+  });
+}
+
+/* Verbleibende Zeit: offene Saetze mal Satzzeit plus ihre Pausen. */
+function sessionLeftMin(){
+  const a = S.active, plan = planOf(a.plan);
+  let sek = 0;
+  (plan.ex || []).forEach(e => {
+    const offen = (a.sets[e.id] || []).filter(s => !s.done);
+    offen.forEach(s => { sek += 20 + (s.reps || 8) * 3 + restFor(e.id); });
+  });
+  return Math.max(0, Math.round(sek / 60));
+}
+
 function viewSession(){
   const a = S.active, plan = planOf(a.plan);
   const prog = sessionProgress();
@@ -2624,7 +2734,12 @@ function viewSession(){
     + 'stroke-dashoffset="'+(circ * (1 - (total?done/total:0))).toFixed(1)+'"/></svg>'
     + '<div style="flex:1"><div style="font-size:19px;font-weight:660;letter-spacing:-.025em">'+esc(plan.title)+'</div>'
     + '<div class="note" style="margin-top:3px"><span id="cnt">'+done+' / '+total+'</span> Sätze · '
-    + '<span id="elapsed">'+elapsedText()+'</span></div></div></div>';
+    + '<span id="elapsed">'+elapsedText()+'</span> · noch <span id="uebrig">'+sessionLeftMin()+'</span> min'
+    + '</div></div></div>';
+
+  /* Die Arbeit sichtbar machen, waehrend sie passiert. */
+  h += '<div class="card stack sessbody"><div class="bodies klein" id="sessbody">'
+    + silhouette(sessionBodyState()) + '</div></div>';
 
   h += plan.ex.map(e => {
     const rows = a.sets[e.id] || [];
@@ -2687,7 +2802,10 @@ function setRow(e, s, i){
 }
 
 /* ================================================================== tabs */
-const TABS = [["heute","Heute",I.dumbbell],["verlauf","Verlauf",I.cal],["ziele","Fortschritt",I.target],["mehr","Mehr",I.cog]];
+/* Fuenf Reiter, jeder mit genau einer Aufgabe. "Fortschritt" heisst "Ziele",
+   damit die Beschriftungen bei fuenf Spalten nicht umbrechen. */
+const TABS = [["heute","Heute",I.dumbbell],["plan","Plan",I.list],["verlauf","Verlauf",I.cal],
+              ["ziele","Ziele",I.target],["mehr","Mehr",I.cog]];
 function renderTabs(){
   if (S.active || route) { tabsEl.innerHTML = ""; return; }
   tabsEl.innerHTML = '<div class="tabbar"><div class="inner">' + TABS.map(t =>
@@ -2707,6 +2825,7 @@ function render(){
   else if (route && route.view === "planlist") { html = viewPlanList(); flat = true; }
   else if (route && route.view === "planedit") { html = viewPlanEdit(route.id); flat = true; }
   else if (tab === "heute") html = viewHeute();
+  else if (tab === "plan") html = viewPlan();
   else if (tab === "verlauf") html = viewVerlauf();
   else if (tab === "ziele") html = viewZiele();
   else html = viewMehr();
@@ -3668,7 +3787,7 @@ document.addEventListener("click", ev => {
       row.querySelector('[data-a="log"]').classList.toggle("on", s.done);
     }
     if (s.done) startRest(id);
-    updateSub(cfg); updateCount(); updateDuel(); return;
+    updateSub(cfg); updateCount(); updateDuel(); updateBody(); return;
   }
   if (a === "addset") {
     const arr = S.active.sets[id];
@@ -3711,6 +3830,15 @@ function sessionProgress(){
   });
   return {done:done, total:total};
 }
+/* Nur die Figur neu zeichnen, nicht die Ansicht — render() waehrend einer
+   Einheit wuerde Eingabefokus und Scrollstand verlieren. */
+function updateBody(){
+  const el = document.getElementById("sessbody");
+  if (el && S.active) el.innerHTML = silhouette(sessionBodyState());
+  const u = document.getElementById("uebrig");
+  if (u && S.active) u.textContent = sessionLeftMin();
+}
+
 function updateCount(){
   const prog = sessionProgress();
   const done = prog.done, total = prog.total;
