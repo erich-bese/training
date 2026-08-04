@@ -281,6 +281,11 @@
      currentColor, deshalb reicht die Textfarbe. */
   .exart.on{color:var(--amber); opacity:1}
   .exrow.skip .exart{opacity:.3}
+  /* Antippbare Zeichnung: gibt beim Druecken nach wie jedes andere Bedienteil. */
+  .artbtn{display:block; border-radius:var(--r-sm); transition:transform .13s var(--ease)}
+  .artbtn:active{transform:scale(.94)}
+  .artbig{display:flex; justify-content:center; margin:10px 0 20px}
+  .artbig .exart{opacity:1}
   .exart .f1{animation:artA 2.4s cubic-bezier(.45,0,.55,1) infinite alternate}
   .exart .f2{animation:artB 2.4s cubic-bezier(.45,0,.55,1) infinite alternate}
   @keyframes artA{0%,42%{opacity:1} 58%,100%{opacity:0}}
@@ -417,7 +422,11 @@
   }
   .tabbar .inner{
     pointer-events:auto; display:flex; gap:3px; max-width:430px; width:100%;
-    margin:0 20px calc(10px + env(safe-area-inset-bottom));
+    /* Der sichere Bereich unten ist 34 Punkt hoch, der Home-Indikator selbst
+       endet aber schon bei rund 13. Voller Abstand plus Rand liess die Leiste
+       deutlich zu hoch stehen. Jetzt bleibt sie knapp ueber dem Indikator;
+       ohne sicheren Bereich — also im Browser — greift der Mindestabstand. */
+    margin:0 20px max(10px, calc(env(safe-area-inset-bottom) - 14px));
     background:linear-gradient(180deg, rgba(40,42,48,.80), rgba(20,21,24,.86));
     backdrop-filter:blur(34px) saturate(185%);
     -webkit-backdrop-filter:blur(34px) saturate(185%);
@@ -446,7 +455,7 @@
      Schatten hebt ihn ab. Sonst geht er zwischen den Satzreihen unter. */
   .restbar{
     position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex; justify-content:center;
-    padding:30px 20px calc(10px + env(safe-area-inset-bottom));
+    padding:30px 20px max(10px, calc(env(safe-area-inset-bottom) - 14px));
     pointer-events:none;
     background:linear-gradient(to top, var(--bg) 46%, rgba(8,9,10,.75) 76%, rgba(8,9,10,0));
   }
@@ -662,7 +671,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "5.3";
+const APP_VERSION = "5.4";
 
 /* ================================================================== icons */
 const I = {
@@ -1598,7 +1607,11 @@ function viewHeute(){
 
   /* Empfehlung mit Begruendung — der Kern der Startseite */
   h += '<div class="card stack">'
-    + '<div class="recbox">' + (recPlan ? exIcon(recPlan.ex[0].id, 66, 88) : '<div class="glyph">'+I.timer+'</div>')
+    + '<div class="recbox">'
+    + (recPlan
+        ? '<button class="artbtn" data-a="artzoom" data-id="'+recPlan.ex[0].id+'">'
+          + exIcon(recPlan.ex[0].id, 66, 88) + '</button>'
+        : '<div class="glyph">'+I.timer+'</div>')
     + '<div style="flex:1"><div class="lead">'+esc(rec.why)+'</div>'
     + (rec.hint ? '<div class="banner amber" style="margin:13px 0 0">'+I.info+'<span>'+esc(rec.hint)+'</span></div>' : '')
     + '</div></div>'
@@ -1913,7 +1926,8 @@ function viewExercise(exId){
   let h = '<div class="topbar"><button class="back" data-a="closeroute">'+I.left+' Zurück</button></div>'
     /* exIcon statt glyph: die Detailansicht hat die Zeichnung frueher gar
        nicht erst versucht und immer das Ersatzsymbol gezeigt. */
-    + '<div style="display:flex;gap:15px;align-items:center;margin-bottom:24px">'+exIcon(exId,52,68,"lg")
+    + '<div style="display:flex;gap:15px;align-items:center;margin-bottom:24px">'
+    + '<button class="artbtn" data-a="artzoom" data-id="'+exId+'">'+exIcon(exId,52,68,"lg")+'</button>'
     + '<div><div style="font-size:25px;font-weight:700;letter-spacing:-.035em;line-height:1.1">'+esc(exName(exId))+'</div>'
     + '<div class="note" style="margin-top:4px">'+(c.variant ? esc(c.variant)+' · ' : '')
     + hist.length+(hist.length === 1 ? ' Einheit' : ' Einheiten')
@@ -2411,6 +2425,17 @@ function numSheet(o){
     + '<button class="btn ghost" data-a="sheetclose">Abbrechen</button>', o);
 }
 
+/* Die Zeichnung in Ruhe ansehen. Auf 40 Pixel in einer Liste ist von der
+   Bewegung wenig zu erkennen; gross laeuft sie sichtbar durch. */
+function artSheet(exId){
+  const art = exArt(exId, 232, 306);
+  if (!art) return;
+  openSheet('<h3>'+esc(exName(exId))+'</h3>'
+    + '<div class="sh-sub">Entspannt und angespannt im Wechsel.</div>'
+    + '<div class="artbig">'+art+'</div>'
+    + '<button class="btn ghost" data-a="sheetclose">Schließen</button>', {});
+}
+
 function exOptsSheet(exId){
   const a = S.active;
   const c = Object.assign({perSide:false, ecc:0, chain:0, variant:""}, a.cfg[exId] || {});
@@ -2748,6 +2773,7 @@ document.addEventListener("click", ev => {
 
   /* ---- sheet plumbing ---- */
   if (a === "sheetclose") { closeSheet(); return; }
+  if (a === "artzoom") { buzz(); artSheet(id); return; }
   if (a === "nfq") {
     const f = document.getElementById("nf");
     const v = Math.max(0, (parseFloat(String(f.value).replace(",", ".")) || 0) + d);
