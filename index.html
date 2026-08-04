@@ -118,6 +118,9 @@
   .amber{color:var(--amber)} .muted{color:var(--muted)} .dim{color:var(--dim)}
   .cool{color:var(--cool)} .faint{color:var(--faint)}
   .row{display:flex; justify-content:space-between; align-items:center}
+  /* Gestapelte Statuszeilen. Der Abstand gehoert hierher und nicht an .row —
+     die Klasse steckt an Dutzenden Stellen und traegt dort keinen Rand. */
+  .status{display:flex; flex-direction:column; gap:11px}
   .hide{display:none}
 
   /* ---- hero ---- */
@@ -922,7 +925,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.7";
+const APP_VERSION = "8.8";
 
 /* ================================================================== icons */
 const I = {
@@ -2838,6 +2841,10 @@ function viewHeute(){
     + (rec.hint ? '<div class="banner amber" style="margin:13px 0 0">'+I.info+'<span>'+esc(rec.hint)+'</span></div>' : '')
     + '</div></div>'
     + '<div class="hair"></div>'
+    /* Zwei Zeilen, aber ein Block: die Tagesform ist die Frage von heute, das
+       Nervensystem die Summe der letzten Tage. Ohne den Abstand stossen die
+       beiden Kapseln aneinander und lesen sich als eine kaputte Form. */
+    + '<div class="status">'
     + '<div class="row"><span class="note">Tagesform</span>'
     + (form
         ? '<span class="pill"><i class="dotlv lv-'+form.level+'"></i>'
@@ -2845,15 +2852,12 @@ function viewHeute(){
           + '</span>'
         : '<button class="pill" data-a="formask"><i class="dotlv" style="background:var(--lv-none)"></i>Noch nicht erfasst</button>')
     + '</div>'
-    /* Zweite Zeile: was die Muskeln nicht wissen. Sie steht bewusst unter der
-       Tagesform und nicht daneben — die Tagesform ist die Frage von heute,
-       das hier die Summe der letzten Tage. Antippbar, weil "erhoeht" ohne die
-       Gruende eine Behauptung waere. */
+    /* Antippbar, weil "gefordert" ohne die Gruende eine Behauptung waere. */
     + '<div class="row"><span class="note">Nervensystem</span>'
     + '<button class="pill" data-a="sysinfo"><i class="dotlv lv-'
     + (rec.sys.level === "hoch" ? "rot" : rec.sys.level === "erhoeht" ? "gelb" : "gruen")
     + '"></i>' + esc(rec.sys.kurz) + '</button>'
-    + '</div></div>';
+    + '</div></div></div>';
 
   /* Der Weg ins Training steht vor der Auswertung: erst handeln, dann
      nachsehen. Frueher stand er ganz unten, hinter Muskelkarte und Vorschau. */
