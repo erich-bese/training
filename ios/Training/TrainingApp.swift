@@ -34,6 +34,13 @@ final class TrainingApp: UIResponder, UIApplicationDelegate {
         flushProtected()
     }
 
+    /// The band writes the night into Health somewhere during the morning,
+    /// often while the app is already open. Coming back to the front is the
+    /// cheapest moment to look again.
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        shell?.refreshHealth()
+    }
+
     func applicationDidEnterBackground(_ application: UIApplication) {
         flushProtected()
         // A rest timer holds this; leaving the app should not leave the screen

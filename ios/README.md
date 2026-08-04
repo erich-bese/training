@@ -12,7 +12,7 @@ Activities auf dem Sperrbildschirm.
 | Stufe | Inhalt | Stand |
 |---|---|---|
 | 1 | Projekt, WKWebView-Hülle, JS↔Swift-Brücke, iCloud-Sicherung | steht |
-| 2 | Apple Health lesen | offen |
+| 2 | Apple Health lesen | steht |
 | 3 | Live Activity für Pause und Übung | offen |
 
 ## Wie die Daten laufen
@@ -47,6 +47,34 @@ Die Web-App merkt von all dem nichts. Im Browser läuft sie unverändert weiter.
 | `confirm()` in den Löschabfragen | native Dialoge (sonst antworten sie stumm mit „nein") |
 | „Backup exportieren" (Blob-Download) | `WKDownloadDelegate` plus Teilen-Ansicht |
 | „Nach Updates suchen" (Service Worker) | holt `index.html` direkt von GitHub Pages |
+
+## Apple Health
+
+Nur lesend, vier Werte: Schlafdauer, Herzratenvariabilität, Ruhepuls,
+Atemfrequenz. Die Zahlen kommen nicht vom Telefon, sondern vom Whoop-Band —
+Health ist nur der Ort, an dem eine fremde App sie abholen darf.
+
+Jeder Wert kommt **mit seiner eigenen Grundlinie**: dem Median der letzten 28
+Nächte. Ohne die sagt keiner der Werte etwas — 60 ms HRV sind für den einen
+viel und für den nächsten wenig. Median statt Mittel, damit eine einzelne
+Nacht die Grundlinie nicht verschiebt.
+
+Die Nacht wird **am Mittag geschnitten**, nicht um Mitternacht: Schlaf vor
+zwölf Uhr gehört zur Nacht davor. Gezählt werden nur die Schlafstufen,
+`inBed` würde waches Liegen mitzählen.
+
+Ablauf: Die Seite fragt (`__training_healthRequest()`), iOS zeigt seine
+Nachfrage, die Hülle liest und schiebt das Ergebnis über
+`__training_healthPush()` zurück. Danach liest sie bei jedem Wechsel in den
+Vordergrund erneut — das Band trägt seine Nacht im Laufe des Vormittags ein.
+
+In der Web-App steht das Ergebnis über der Tagesform und belegt Schlaf,
+Energie und Erschöpfung vor. Muskeln und Motivation nicht: die weiß das Band
+nicht. Alles überschreibbar, und im Browser fehlt der Block ersatzlos.
+
+**HealthKit verrät nie, ob Lesen erlaubt wurde** — eine gesperrte Größe
+liefert einfach nichts. Deshalb wird nur gemerkt, dass gefragt wurde, nie die
+Antwort. Das ehrliche Signal ist, ob Werte zurückkommen.
 
 ## Updates der Web-App
 
@@ -104,6 +132,7 @@ Ausgangspunkt.
 | `Training/Bridge.swift` | nimmt die Nachrichten der Seite entgegen, injiziert das Skript |
 | `Training/Resources/Bridge.js` | alles, was in der Seite passiert |
 | `Training/Store.swift` | Datenhaltung, Schnappschüsse |
+| `Training/Health.swift` | letzte Nacht aus Apple Health, mit Grundlinien |
 | `Training/WebUpdater.swift` | Kopie der Web-App auspacken und aktuell halten |
 | `Training/Log.swift` | Diagnose, in der Konsole des Macs lesbar |
 | `sync-web.sh` | kopiert die Web-App ins Ziel |
@@ -111,5 +140,7 @@ Ausgangspunkt.
 ## Randbedingungen
 
 - Bundle-ID `de.besemedia.training`, nur iPhone, nur Hochformat, iOS 17+
+- HealthKit-Berechtigung in `Training/Training.entitlements`; der TestFlight-Build
+  braucht die Fähigkeit **HealthKit** im Profil der App-ID
 - `DEVELOPMENT_TEAM` ist leer, bis das Entwicklerprogramm steht
 - Keine Abhängigkeiten, kein Paketmanager — passend zur Web-App

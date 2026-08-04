@@ -13,6 +13,7 @@
 		3A0000000000000000000004 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0000000000000000000004 /* Store.swift */; };
 		3A0000000000000000000005 /* WebUpdater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0000000000000000000005 /* WebUpdater.swift */; };
 		3A0000000000000000000006 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A0000000000000000000006 /* Log.swift */; };
+		3A000000000000000000000B /* Health.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A000000000000000000000B /* Health.swift */; };
 		3A0000000000000000000007 /* Bridge.js in Resources */ = {isa = PBXBuildFile; fileRef = 2A0000000000000000000007 /* Bridge.js */; };
 		3A0000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2A0000000000000000000008 /* Assets.xcassets */; };
 		3A000000000000000000000A /* web in Resources */ = {isa = PBXBuildFile; fileRef = 2A000000000000000000000A /* web */; };
@@ -30,6 +31,8 @@
 		2A0000000000000000000008 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2A0000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2A000000000000000000000A /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; path = web; sourceTree = "<group>"; };
+		2A000000000000000000000B /* Health.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Health.swift; sourceTree = "<group>"; };
+		2A000000000000000000000C /* Training.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Training.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +71,8 @@
 				2A0000000000000000000004 /* Store.swift */,
 				2A0000000000000000000005 /* WebUpdater.swift */,
 				2A0000000000000000000006 /* Log.swift */,
+				2A000000000000000000000B /* Health.swift */,
+				2A000000000000000000000C /* Training.entitlements */,
 				2A0000000000000000000007 /* Bridge.js */,
 				2A000000000000000000000A /* web */,
 				2A0000000000000000000008 /* Assets.xcassets */,
@@ -187,6 +192,7 @@
 				3A0000000000000000000004 /* Store.swift in Sources */,
 				3A0000000000000000000005 /* WebUpdater.swift in Sources */,
 				3A0000000000000000000006 /* Log.swift in Sources */,
+				3A000000000000000000000B /* Health.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -259,6 +265,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Training/Training.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -281,6 +288,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Training/Training.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";

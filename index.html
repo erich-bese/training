@@ -793,6 +793,35 @@
   details.more summary::after{content:"▾"; font-size:11px; opacity:.7}
   details.more[open] summary::after{content:"▴"}
 
+  /* Letzte Nacht aus Apple Health. Steht ueber den Fragen, weil es sie zum
+     Teil beantwortet — und abgesetzt, damit klar bleibt, was gemessen und was
+     gefragt ist. Nur in der iOS-Huelle vorhanden. */
+  .hbox{
+    margin:0 0 18px; padding:14px; border-radius:var(--r-md);
+    background:rgba(255,255,255,.035); border:1px solid var(--line);
+  }
+  .hhead{
+    font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--faint); margin-bottom:12px;
+  }
+  .hgrid{display:flex; gap:8px}
+  .hcell{flex:1; min-width:0}
+  .hcap{font-size:11px; color:var(--faint); margin-bottom:3px}
+  .hnum{
+    font-size:17px; font-weight:680; letter-spacing:-.03em; color:var(--bone);
+    font-variant-numeric:tabular-nums; white-space:nowrap;
+  }
+  .habw{font-size:11px; color:var(--faint); margin-top:2px; white-space:nowrap}
+  .habw .hup{color:var(--lv-gruen)}
+  .habw .hdown{color:var(--amber)}
+  .hnote{margin-top:12px; font-size:11.5px; color:var(--faint); line-height:1.45}
+  /* Welche Antwort aus der Messung kommt und welche von ihm. */
+  .ftag{
+    margin-left:7px; padding:2px 6px; border-radius:6px; font-size:9.5px;
+    letter-spacing:.08em; text-transform:uppercase; vertical-align:1px;
+    background:rgba(233,166,60,.14); color:var(--amber);
+  }
+
   .frow{padding:13px 0; border-top:1px solid var(--line)}
   .frow:first-child{border-top:none; padding-top:0}
   .frow .fq{font-size:14px; margin-bottom:9px}
@@ -866,7 +895,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.3";
+const APP_VERSION = "8.4";
 
 /* ================================================================== icons */
 const I = {
@@ -3680,15 +3709,102 @@ function swapSheet(planId, i, mode){
     + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
 }
 
+/* ------------------------------------------------------------ Apple Health */
+/* Nur in der iOS-Huelle vorhanden, im Browser bleibt beides leer — deshalb
+   ueberall defensiv abgefragt. Die Zahlen stammen nicht vom Telefon, sondern
+   vom Band; Health ist nur der Ort, an dem sie abgeholt werden duerfen.
+   Jeder Wert kommt mit seiner eigenen Grundlinie (Median der letzten 28
+   Naechte). Ohne die sagt keiner der Werte etwas: 60 ms sind fuer den einen
+   viel und fuer den naechsten wenig. */
+const healthNow = () => (typeof window !== "undefined" && window.__training_health) || null;
+const healthPossible = () => !!(typeof window !== "undefined" && window.__training_healthRequest);
+
+/* Merkt sich, dass gerade jemand auf die Freigabe wartet — nicht im Zustand,
+   der auf die Platte geht, sondern nur fuer diesen Lauf. */
+let healthWartet = null;
+window.addEventListener("training:health", () => {
+  if (!healthWartet) return;
+  const w = healthWartet; healthWartet = null;
+  formSheet(w.next);
+});
+
+const hDur = min => Math.floor(min/60) + ":" + String(Math.round(min%60)).padStart(2,"0") + " h";
+
+/* Nur das, was gemessen ist. Muskeln und Motivation stehen bewusst nicht hier —
+   die weiss das Band nicht, die weiss nur er. */
+function healthSuggest(h){
+  const out = {};
+  if (h.schlaf != null){
+    const b = h.schlafBasis;
+    out.sleep = (h.schlaf < 330 || (b && h.schlaf < b - 60)) ? 1
+              : (h.schlaf >= 420 && (!b || h.schlaf >= b - 15)) ? 3 : 2;
+  }
+  if (h.hrv != null && h.hrvBasis){
+    out.energy = h.hrv <= h.hrvBasis * 0.90 ? 1 : h.hrv >= h.hrvBasis * 1.03 ? 3 : 2;
+  }
+  if (h.puls != null && h.pulsBasis){
+    out.drain = h.puls >= h.pulsBasis + 4 ? 1 : h.puls <= h.pulsBasis + 1 ? 3 : 2;
+  }
+  return out;
+}
+
+/* Eine Kachel je Wert: Zahl gross, Abweichung von der Grundlinie darunter.
+   Ohne Grundlinie steht dort nichts — eine erfundene Einordnung waere
+   schlimmer als gar keine. */
+function healthBox(h){
+  const kachel = (titel, wert, abw) => '<div class="hcell"><div class="hcap">'+titel+'</div>'
+    + '<div class="hnum">'+wert+'</div>'
+    + '<div class="habw">'+(abw || "—")+'</div></div>';
+  const delta = (wert, basis, einheit, hochIstGut) => {
+    if (basis == null) return "";
+    const d = Math.round((wert - basis) * 10) / 10;
+    if (!d) return "wie sonst";
+    const gut = hochIstGut ? d > 0 : d < 0;
+    return '<span class="'+(gut ? "hup" : "hdown")+'">'+(d > 0 ? "+" : "")+kg(d)+' '+einheit+'</span>';
+  };
+  const zellen = [];
+  if (h.schlaf != null) zellen.push(kachel("Schlaf", hDur(h.schlaf),
+    h.schlafBasis == null ? "" : delta(Math.round(h.schlaf), Math.round(h.schlafBasis), "min", true)));
+  if (h.hrv != null) zellen.push(kachel("HRV", kg(h.hrv)+" ms", delta(h.hrv, h.hrvBasis, "ms", true)));
+  if (h.puls != null) zellen.push(kachel("Ruhepuls", kg(h.puls), delta(h.puls, h.pulsBasis, "", false)));
+  if (h.atem != null) zellen.push(kachel("Atmung", kg(h.atem), delta(h.atem, h.atemBasis, "", false)));
+  if (!zellen.length) return "";
+  return '<div class="hbox"><div class="hhead">Letzte Nacht'
+    + (h.quelle ? ' · '+esc(h.quelle) : '')+'</div>'
+    + '<div class="hgrid">'+zellen.join("")+'</div>'
+    + '<div class="hnote">Vorbelegt, wo gemessen. Alles überschreibbar.</div></div>';
+}
+
 /* ---- Tagesform: fuenf Fragen, je drei Stufen, ein Speichern ---- */
 function formSheet(next, working){
-  const cur = working || formForToday() || {};
+  const gespeichert = formForToday();
+  const h = healthNow();
+  /* Vorschlaege nur beim ersten Oeffnen des Tages. Steht schon etwas fest,
+     bleibt es stehen — sonst wuerde eine eigene Antwort beim naechsten
+     Aufschlagen wieder von der Messung ueberschrieben. */
+  const cur = working || gespeichert
+    || (h ? healthSuggest(h) : {});
+  const ausHealth = (!working && !gespeichert && h) ? healthSuggest(h) : {};
+  const kasten = h ? healthBox(h) : "";
   openSheet(
     '<h3>Wie geht es dir heute?</h3>'
     + '<div class="sh-sub">Fünf kurze Fragen. Danach passt die Empfehlung dazu.</div>'
+    /* Drei Faelle, drei verschiedene Dinge: Werte da, Freigabe noch nicht
+       erteilt, oder Freigabe erteilt und trotzdem nichts gemessen. Der letzte
+       darf nicht wie der zweite aussehen — sonst tippt man auf einen Knopf,
+       der nichts mehr tun kann. */
+    + (kasten ? kasten
+         : healthPossible()
+           ? '<button class="btn ghost" data-a="healthask">Aus Apple Health lesen</button>'
+             + (h ? '<div class="hnote" style="margin:8px 0 16px">Für letzte Nacht liegt in Health nichts vor. '
+                    + 'Das Band trägt seine Nacht meist im Laufe des Vormittags ein.</div>'
+                  : '<div class="hnote" style="margin:8px 0 16px">Liest Schlaf, HRV und Ruhepuls der letzten Nacht. '
+                    + 'Nur lesend.</div>')
+           : '')
     + FORM_FIELDS.map(f => {
         const v = +cur[f.k] || 0;
-        return '<div class="frow"><div class="fq">'+f.label+'</div><div class="fopts">'
+        return '<div class="frow"><div class="fq">'+f.label
+          + (ausHealth[f.k] ? '<span class="ftag">Health</span>' : '')+'</div><div class="fopts">'
           + [[1,f.low],[2,f.mid],[3,f.high]].map(o =>
               '<button data-a="fset" data-id="'+f.k+'" data-d="'+o[0]+'" class="'+(v===o[0]?"on":"")+'">'
               + esc(o[1])+'</button>').join("")
@@ -4113,6 +4229,14 @@ document.addEventListener("click", ev => {
     const w = Object.assign({}, sheetState.form);
     w[id] = d; buzz();
     formSheet(sheetState.next, w);
+    return;
+  }
+  /* Loest die Nachfrage von iOS aus. Die Antwort kommt nicht hier zurueck,
+     sondern spaeter ueber `training:health` — dort baut sich das Blatt neu auf. */
+  if (a === "healthask") {
+    buzz();
+    healthWartet = {next:sheetState.next};
+    window.__training_healthRequest();
     return;
   }
   if (a === "formok") {

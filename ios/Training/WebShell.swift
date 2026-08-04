@@ -54,6 +54,13 @@ final class WebShell: UIViewController {
         bridge.flushPage(completion: completion)
     }
 
+    /// Last night, once more. Called when the app comes back to the front —
+    /// the band syncs its night at some point during the morning, and the app
+    /// is usually already open by then.
+    func refreshHealth() {
+        bridge.fetchHealth(ask: false)
+    }
+
     // MARK: - Setup
 
     private func buildWebView() {

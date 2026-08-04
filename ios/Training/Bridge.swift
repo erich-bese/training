@@ -83,8 +83,18 @@ final class Bridge: NSObject, WKScriptMessageHandler {
         case "update":
             checkForUpdate()
 
+        /* Health is only ever fetched because the page asked. `ask` is the
+           difference between the first time — where iOS puts its own sheet on
+           screen — and every refresh afterwards. */
+        case "health":
+            fetchHealth(ask: body["ask"] as? Bool ?? false)
+
         case "ready":
             Log.info("bridge: page ready, shell \(body["version"] as? String ?? "?")")
+            // Once he has allowed it, the values are simply there when the page
+            // opens. Asking again on every start would be the wrong kind of
+            // eager.
+            if Self.healthAsked { fetchHealth(ask: false) }
 
         case "log":
             Log.info("page: \(body["text"] as? String ?? "")")
@@ -118,6 +128,37 @@ final class Bridge: NSObject, WKScriptMessageHandler {
         case ..<40: mediumTap.impactOccurred()
         default: heavyTap.impactOccurred()
         }
+    }
+
+    // MARK: - Health
+
+    /// Whether the Health sheet has been shown once. HealthKit deliberately
+    /// never reveals whether reading was granted, so this only records that the
+    /// question was asked — not the answer.
+    private static var healthAsked: Bool {
+        get { UserDefaults.standard.bool(forKey: "healthAsked") }
+        set { UserDefaults.standard.set(newValue, forKey: "healthAsked") }
+    }
+
+    /// Fetches last night and hands it to the page. Runs on every foreground
+    /// once permission has been asked for, so the numbers are current when the
+    /// day's form is opened.
+    func fetchHealth(ask: Bool) {
+        let lesen = { [weak self] in
+            Health.shared.summary { dict in self?.pushHealth(dict) }
+        }
+        guard ask else { lesen(); return }
+        Health.shared.authorize { ok in
+            Self.healthAsked = true
+            if !ok { Log.warn("bridge: health authorisation was not completed") }
+            lesen()
+        }
+    }
+
+    private func pushHealth(_ dict: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: dict),
+              let json = String(data: data, encoding: .utf8) else { return }
+        webView?.evaluateJavaScript("window.__training_healthPush && window.__training_healthPush(\(json))")
     }
 
     private func checkForUpdate() {

@@ -20,6 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Liest die letzte Nacht — Schlaf, Herzratenvariabilität, Ruhepuls und Atemfrequenz — um die Tagesform vorzuschlagen. Es wird nichts nach Health zurückgeschrieben und nichts das Gerät verlassen.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>

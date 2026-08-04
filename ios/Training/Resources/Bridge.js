@@ -167,6 +167,25 @@
     if (typeof window.updMsg === "function") window.updMsg(text);
   };
 
+  /* --------------------------------------------------------- health ------ */
+  /* Apple Health, read only. There is no browser API to shim here, so this is
+     the one place where the page learns something it could not have known on
+     its own — through a global it has to ask for defensively. In a browser the
+     global stays null and the page simply does not show the block.
+
+     The shell pushes on its own: once at load, and again every time the app
+     comes back to the front. `request` is only for the very first time, when
+     iOS still has to put its permission sheet on screen — it must come from a
+     tap, not from the page loading. */
+  window.__training_health = null;
+  window.__training_healthPush = function (data) {
+    window.__training_health = data && data.ok ? data : null;
+    try {
+      window.dispatchEvent(new CustomEvent("training:health", { detail: window.__training_health }));
+    } catch (e) {}
+  };
+  window.__training_healthRequest = function () { post({ cmd: "health", ask: true }); };
+
   /* Marker for anything that wants to know it is running inside the shell. */
   window.__training_native = SHELL_VERSION;
 })();
