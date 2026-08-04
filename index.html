@@ -507,15 +507,22 @@
   #restslot:empty{display:none}
   #restslot .restbar{position:static; padding:0; background:none; display:block; margin-top:12px}
   #restslot .restbar .inner{
-    background:rgba(233,166,60,.10); border:1px solid var(--on-line);
+    background:rgba(255,255,255,.05); border:1px solid var(--line);
     box-shadow:none; animation:none; padding:10px 13px; max-width:none;
+    overflow:hidden;
   }
   #restslot .restbar .t{font-size:19px}
-  .ring .val.pause{stroke:var(--amber); transition:stroke-dashoffset 1s linear}
-  /* Kein zweites Fortschrittselement neben dem Ring: waehrend der Pause
-     zaehlt der Ring selbst herunter. Die Satzzahl steht ohnehin als Text
-     daneben, der Ring wird dafuer nicht gebraucht. */
-  #restslot .restbar .prog{display:none}
+  /* Die Zeile laeuft selbst leer, statt einen Strich darunter zu tragen.
+     Bewusst schwach: die Restzeit steht in Amber darauf und muss lesbar
+     bleiben. Die Flaeche darunter ist deshalb neutral. */
+  #restslot .restbar .prog{
+    position:absolute; inset:0; height:auto; width:auto;
+    border-radius:0; background:none; overflow:hidden; z-index:0;
+  }
+  #restslot .restbar #restprog{background:rgba(233,166,60,.14)}
+  #restslot .restbar #restlbl,
+  #restslot .restbar .t,
+  #restslot .restbar .tag{position:relative; z-index:1}
   .sessbody .bodies.klein .body{max-width:104px}
   .sessbody{padding:15px 19px 13px}
   .sessbody .bodies .cap{display:none}
@@ -633,6 +640,9 @@
   }
   @media (prefers-reduced-motion:reduce){.restbar.over .inner{animation:none}}
   .restbar .prog{position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:0 0 var(--r-md) var(--r-md); overflow:hidden}
+  /* Farbe und Uebergang gehoeren in den Stil, nicht ins Markup: inline
+     gesetzt liesse sich der Balken an keiner Stelle anders darstellen. */
+  .restbar #restprog{display:block; height:100%; background:var(--amber); transition:width 1s linear}
 
   .topbar{display:flex; align-items:center; justify-content:space-between; padding:26px 0 20px; gap:12px}
   .back{color:var(--muted); display:flex; align-items:center; gap:3px; font-size:14.5px}
@@ -811,7 +821,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "7.7";
+const APP_VERSION = "7.9";
 
 /* ================================================================== icons */
 const I = {
@@ -2924,23 +2934,14 @@ let restDone = false;
 /* Der Balken wird einmal gebaut und danach nur noch beschriftet. Vorher wurde
    er jede Sekunde komplett neu erzeugt — dadurch lief die Einblend-Animation
    im Sekundentakt neu, das war das Flackern des Countdowns. */
-/* Der Ring in der Kopfzeile zeigt normalerweise den Fortschritt der Einheit.
-   Waehrend einer Pause zeigt er stattdessen die ablaufende Zeit — ein zweiter
-   Balken daneben war ein Fremdkoerper. `anteil` null heisst: zurueck zum
-   Fortschritt. */
-function ringZeigen(anteil){
+/* Der Ring zeigt eines: wie weit die Einheit ist. Ihn zwischendurch fuer die
+   Pause umzuwidmen war verwirrend — man liest ihn als Fortschritt. */
+function ringZeigen(){
   const ring = document.getElementById("ring");
   if (!ring) return;
-  const circ = 2 * Math.PI * 22;
-  if (anteil === null || anteil === undefined) {
-    const prog = sessionProgress();
-    const f = prog.total ? prog.done / prog.total : 0;
-    ring.setAttribute("stroke-dashoffset", (circ * (1 - f)).toFixed(1));
-    ring.classList.remove("pause");
-  } else {
-    ring.setAttribute("stroke-dashoffset", (circ * (1 - anteil)).toFixed(1));
-    ring.classList.add("pause");
-  }
+  const prog = sessionProgress();
+  const f = prog.total ? prog.done / prog.total : 0;
+  ring.setAttribute("stroke-dashoffset", (2 * Math.PI * 22 * (1 - f)).toFixed(1));
 }
 
 function renderRest(){
@@ -2949,7 +2950,7 @@ function renderRest(){
      sichtbar. Ohne laufende Einheit bleibt der schwebende Balken unten. */
   const ziel = document.getElementById("restslot") || restEl;
   if (ziel !== restEl) restEl.innerHTML = "";
-  if (!S.active || !S.rest) { ziel.innerHTML = ""; ringZeigen(null); return; }
+  if (!S.active || !S.rest) { ziel.innerHTML = ""; return; }
   const left = restLeft();
   const over = left <= 0;
   const totalSec = S.rest.total || S.settings.rest || 1;
@@ -2963,7 +2964,7 @@ function renderRest(){
       + I.timer + '<span>Pause</span></div>'
       + '<div class="t num" id="restt">0:00</div>'
       + '<button class="tag" data-a="skiprest" id="restbtn">Fertig</button>'
-      + '<div class="prog"><i id="restprog" style="display:block;height:100%;background:var(--amber);transition:width 1s linear"></i></div>'
+      + '<div class="prog"><i id="restprog"></i></div>'
       + '</div></div>';
     bar = ziel.querySelector(".restbar");
   }
@@ -2979,7 +2980,6 @@ function renderRest(){
   if (btn && btn.textContent !== btxt) btn.textContent = btxt;
   const p = document.getElementById("restprog");
   if (p) p.style.width = (frac*100).toFixed(1) + "%";
-  ringZeigen(over ? null : frac);
 }
 function startRest(exId){
   const dauer = exId ? restFor(exId) : (S.settings.rest || 120);
@@ -3946,7 +3946,7 @@ function updateCount(){
   const done = prog.done, total = prog.total;
   const el = document.getElementById("cnt");
   if (el) el.textContent = done + ' / ' + total;
-  if (!S.rest) ringZeigen(null);
+  ringZeigen(null);
   const btn = document.querySelector('[data-a="finish"]');
   if (btn) done ? btn.removeAttribute("disabled") : btn.setAttribute("disabled", "");
 }
