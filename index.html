@@ -732,7 +732,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "6.0";
+const APP_VERSION = "6.4";
 
 /* ================================================================== icons */
 const I = {
@@ -914,11 +914,28 @@ const TYPE_COLOR = {
 /* Ladder goals: the end target stays, but the app aims at the next rung so
    progress stays visible instead of a bar that never moves. */
 const GOALS = [
-  {label:"Klimmzüge am Stück", unit:"Wdh.", kind:"reps", ex:"pullup", steps:[8,12,16,20]},
-  {label:"Klimmzüge mit Zusatz", unit:"kg", kind:"load", ex:"pullup", steps:[5,10,20,35,50]},
-  {label:"Dips mit Zusatz", unit:"kg", kind:"load", ex:"dips", steps:[5,10,20,35,50]},
-  {label:"Bankdrücken", unit:"kg", kind:"load", ex:"bench", steps:[60,75,90,100]},
-  {label:"Kniebeuge", unit:"kg", kind:"load", ex:"squat", steps:[45,60,80,100]}
+  /* `reps` ist die Satzlaenge, ab der ein Gewicht zaehlt. Ohne sie waere ein
+     Lastziel nicht ueberpruefbar: 50 kg fuer eine Wiederholung ist etwas
+     ganz anderes als 50 kg fuer zehn.
+     Bei Klimmzuegen und Dips gilt zehn — die Vorgabe des Nutzers und in
+     diesen Bewegungen die uebliche Messlatte. Bei den geladenen Grunduebungen
+     fuenf, der klassische Kraftstandard.
+     Die Endstufen sind bewusst weit oben: die erste Stufe soll in Monaten
+     fallen, die letzte ueber Jahre tragen. */
+  {label:"Strikte Klimmzüge",   unit:"Wdh.", kind:"reps", ex:"pullup",
+   steps:[8,12,18,25,35]},
+  {label:"Klimmzüge mit Zusatz",unit:"kg",   kind:"load", ex:"pullup",   reps:10,
+   steps:[5,15,25,40,50]},
+  {label:"Strikte Dips",        unit:"Wdh.", kind:"reps", ex:"dips",
+   steps:[10,20,30,40,50]},
+  {label:"Dips mit Zusatz",     unit:"kg",   kind:"load", ex:"dips",     reps:10,
+   steps:[5,15,25,40,50]},
+  {label:"Bankdrücken",         unit:"kg",   kind:"load", ex:"bench",    reps:5,
+   steps:[60,80,100,120,140]},
+  {label:"Kniebeuge",           unit:"kg",   kind:"load", ex:["squat","squat_light"], reps:5,
+   steps:[50,80,110,140,170]},
+  {label:"Kreuzheben",          unit:"kg",   kind:"load", ex:["deadlift","dl_light"], reps:5,
+   steps:[90,120,150,180,210]}
 ];
 
 /* ================================================================== utils */
@@ -1079,10 +1096,24 @@ function prsFrom(sessions){
   }));
   return pr;
 }
+/* Bei Wiederholungszielen zaehlt der laengste Satz ohne Zusatzgewicht.
+   Bei Lastzielen das schwerste Gewicht, das die geforderte Satzlaenge
+   getragen hat — nicht das schwerste ueberhaupt. */
+const goalReps = g => g.reps || 5;
+/* Ein Ziel kann mehrere Uebungen umfassen — schwere und leichte Variante
+   derselben Bewegung. Gemessen wird die Bewegung, nicht der Platz im Plan. */
+const goalEx = g => Array.isArray(g.ex) ? g.ex : [g.ex];
 const rawGoalValue = (g, pr) => {
-  const p = pr[g.ex];
-  if (!p) return 0;
-  return g.kind === "reps" ? p.repsAtBw : Math.max(0, p.weight);
+  if (g.kind === "reps") {
+    return goalEx(g).reduce((m, id) => Math.max(m, pr[id] ? pr[id].repsAtBw : 0), 0);
+  }
+  let best = 0;
+  S.sessions.forEach(s => (s.entries || []).forEach(e => {
+    if (goalEx(g).indexOf(e.id) < 0 || !e.reps.length) return;
+    if (Math.max.apply(null, e.reps) < goalReps(g)) return;
+    best = Math.max(best, e.perSide ? e.weight * 2 : e.weight);
+  }));
+  return best;
 };
 /* the rung we are climbing towards right now */
 function goalStep(g, pr){
@@ -1610,12 +1641,15 @@ const MONATE = ["Januar","Februar","März","April","Mai","Juni",
 function goalSeries(g){
   const punkte = [];
   S.sessions.forEach(s => s.entries.forEach(e => {
-    if (e.id !== g.ex || !e.reps.length) return;
+    if (goalEx(g).indexOf(e.id) < 0 || !e.reps.length) return;
     /* Strikte Wiederholungen zaehlen nur ohne Zusatzgewicht. */
     if (g.kind === "reps" && e.weight) return;
+    /* Lastziele: nur Saetze, die die geforderte Laenge erreicht haben. */
+    if (g.kind === "load" && Math.max.apply(null, e.reps) < goalReps(g)) return;
     punkte.push({
       t: sessionTime(s),
-      wert: g.kind === "reps" ? Math.max.apply(null, e.reps) : (+e.weight || 0),
+      wert: g.kind === "reps" ? Math.max.apply(null, e.reps)
+                              : (e.perSide ? e.weight * 2 : +e.weight || 0),
       perSide: !!e.perSide, ecc: +e.ecc || 0
     });
   }));
@@ -1658,7 +1692,7 @@ function goalForecast(g, ziel, standVon){
      eine Wiederholung alle drei Einheiten ist der Anfangswert, den die
      Messung spaeter ersetzt. */
   const proEinheit = g.kind === "reps" ? 1/3 : (incOf(g.ex) || 1);
-  const erwartet = proEinheit * (exFrequency(g.ex) || 2/7);
+  const erwartet = proEinheit * (goalEx(g).reduce((m, id) => Math.max(m, exFrequency(id)), 0) || 2/7);
 
   /* Gemessene Steigung, sobald zwei vergleichbare Punkte ueber mindestens
      einem Tag liegen. */
@@ -1681,6 +1715,10 @@ function goalForecast(g, ziel, standVon){
   const proTag = gemessen === null ? erwartet : gemessen * gewicht + erwartet * (1 - gewicht);
 
   const guete = n >= 6 ? "prognose" : n >= 3 ? "schaetzung" : "grob";
+  /* Ohne einen einzigen Satz, der den Standard erfuellt, gibt es keinen
+     Ausgangspunkt. Der Abstand ist dann nicht in Kilo zu messen, sondern in
+     Wiederholungen — eine Hochrechnung waere hier schlicht falsch. */
+  if (!n) return {guete:guete, punkte:0, keineBasis:true};
   if (!(proTag > 0)) return {guete:guete, punkte:n, steigend:false};
 
   const tage = (ziel - stand) / proTag;
@@ -1694,6 +1732,11 @@ function goalForecast(g, ziel, standVon){
 function goalForecastText(g, ziel, standVon){
   const f = goalForecast(g, ziel, standVon);
   const vorsatz = f.guete === "prognose" ? "Prognose" : f.guete === "schaetzung" ? "Schätzung" : "Grob geschätzt";
+  if (f.keineBasis) {
+    return g.kind === "load"
+      ? "Noch kein Satz mit " + goalReps(g) + " Wdh."
+      : "Noch keine Einheit erfasst";
+  }
   if (!f.steigend) return "Noch kein messbarer Anstieg";
   if (f.zuWeit) return vorsatz + ": über drei Jahre";
   if (f.tage <= 0) return "Etappe rechnerisch erreicht";
@@ -1738,7 +1781,8 @@ function goalsCard(pr){
       + '<div class="g2marks">'+marken+'</div>'
       + '<div class="g2foot">'
       + (st.done ? '<span class="amber">Endziel erreicht</span>'
-                 : '<span>Nächste Etappe '+st.target+' '+g.unit+'</span>'
+                 : '<span>Nächste Etappe '+st.target+' '+g.unit
+                     + (g.kind === "load" ? ' × '+goalReps(g)+' Wdh.' : '')+'</span>'
                    + '<span class="g2prog'+(reif ? " reif" : "")+'">'+prognose+'</span>')
       + '</div></div>';
   }).join("") + '</div>';
