@@ -227,12 +227,45 @@
   .bar i.done{background:var(--amber); box-shadow:0 0 12px rgba(233,166,60,.5)}
   .goal+.goal{margin-top:17px}
   .goal .row{margin-bottom:9px; font-size:13.5px}
-  /* Prognosezeile. Eigener Name statt .prog — das gibt es im Pausenbalken
-     schon, und in einer Datei ohne Scoping wirkt jede Regel global. */
-  .goal .gprog{
-    font-size:12px; margin-top:5px; color:var(--dim); font-weight:560;
-    letter-spacing:-.005em;
+  /* ---- Hauptziele: die Etappen als Leiter ---- */
+  .goal2 + .goal2{margin-top:22px; padding-top:22px; border-top:1px solid var(--line)}
+  .g2head{display:flex; justify-content:space-between; align-items:baseline; gap:12px}
+  .g2name{font-size:15px; font-weight:600; letter-spacing:-.018em; color:var(--bone)}
+  .g2val{
+    font-size:24px; font-weight:700; letter-spacing:-.045em; line-height:1;
+    font-variant-numeric:tabular-nums; flex-shrink:0;
   }
+  .g2val small{font-size:11.5px; font-weight:600; color:var(--muted); margin-left:4px; letter-spacing:0}
+
+  /* Eine Spur je Etappe. Der Zwischenraum trennt die Stufen sichtbar — ein
+     durchgehender Balken wuerde die Leiter wieder zu einem Strich machen. */
+  .g2track{display:flex; gap:4px; margin-top:14px}
+  .g2seg{
+    flex:1; height:6px; border-radius:99px; overflow:hidden;
+    background:rgba(255,255,255,.07);
+  }
+  .g2seg i{
+    display:block; height:100%; border-radius:99px; background:var(--dim);
+    transform-origin:left center;
+  }
+  .g2seg.voll i{background:var(--bone)}
+  .g2seg.jetzt i{background:var(--amber); box-shadow:0 0 14px rgba(233,166,60,.6)}
+
+  .g2marks{display:flex; gap:4px; margin-top:7px}
+  .g2marks span{
+    flex:1; text-align:right; font-size:10px; color:var(--faint);
+    font-variant-numeric:tabular-nums; letter-spacing:.02em;
+  }
+
+  .g2foot{display:flex; flex-direction:column; gap:3px; margin-top:11px}
+  .g2foot > span:first-child{font-size:12.5px; color:var(--muted)}
+  /* Ein Hinweis auf fehlende Daten tritt zurueck, eine echte Prognose leuchtet. */
+  .g2prog{font-size:12px; color:var(--faint)}
+  .g2prog.reif{color:var(--amber); font-weight:600}
+
+  /* Die Leiter baut sich von links auf, Stufe fuer Stufe und Ziel fuer Ziel.
+     Nur beim Ansichtswechsel — sonst zappelt sie bei jeder Eingabe. */
+  .anim .g2seg i{animation:barGrow .6s var(--ease) both; animation-delay:var(--d,0s)}
   .goal .mini{font-size:12px; color:var(--faint); margin-top:6px; letter-spacing:.01em}
 
   .ring{width:52px; height:52px; flex-shrink:0; transform:rotate(-90deg)}
@@ -699,7 +732,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "5.9";
+const APP_VERSION = "6.0";
 
 /* ================================================================== icons */
 const I = {
@@ -881,10 +914,11 @@ const TYPE_COLOR = {
 /* Ladder goals: the end target stays, but the app aims at the next rung so
    progress stays visible instead of a bar that never moves. */
 const GOALS = [
-  {label:"Strikte Klimmzüge", unit:"Wdh.", kind:"reps", ex:"pullup", steps:[8,12,16,20]},
+  {label:"Klimmzüge am Stück", unit:"Wdh.", kind:"reps", ex:"pullup", steps:[8,12,16,20]},
   {label:"Klimmzüge mit Zusatz", unit:"kg", kind:"load", ex:"pullup", steps:[5,10,20,35,50]},
   {label:"Dips mit Zusatz", unit:"kg", kind:"load", ex:"dips", steps:[5,10,20,35,50]},
-  {label:"Bankdrücken", unit:"kg", kind:"load", ex:"bench", steps:[60,75,90,100]}
+  {label:"Bankdrücken", unit:"kg", kind:"load", ex:"bench", steps:[60,75,90,100]},
+  {label:"Kniebeuge", unit:"kg", kind:"load", ex:"squat", steps:[45,60,80,100]}
 ];
 
 /* ================================================================== utils */
@@ -1591,60 +1625,122 @@ function goalSeries(g){
   return punkte.filter(p => p.perSide === heutigerAufbau.perSide && p.ecc === heutigerAufbau.ecc);
 }
 
-/* Ausgleichsgerade durch die Reihe und daraus der Termin.
-   Bewusst streng: unter vier vergleichbaren Einheiten oder drei Wochen
-   Zeitraum sagt sie nichts. Eine Hochrechnung aus zwei Punkten waere
-   geraten, und geraten sieht aus wie gerechnet. */
-const PROG_MIN_PUNKTE = 4, PROG_MIN_TAGE = 21;
-function goalForecast(g, ziel){
+/* Wie oft diese Uebung tatsaechlich drankommt, in Einheiten pro Tag. */
+function exFrequency(exId){
+  const jetzt = Date.now();
+  const treffer = S.sessions.filter(s => jetzt - sessionTime(s) <= 42 * 86400000
+    && (s.entries || []).some(e => e.id === exId && e.reps.length));
+  if (!treffer.length) return 0;
+  const aeltest = Math.min.apply(null, treffer.map(sessionTime));
+  const spanne = Math.max(7, (jetzt - aeltest) / 86400000 + 1);
+  return treffer.length / spanne;
+}
+
+/* Termin fuer eine Etappe.
+   Es wird immer etwas gesagt — auch am ersten Tag. Nur woher die Steigung
+   kommt, aendert sich:
+
+   wenig Daten  → Erwartung aus dem Plan. Die App erhoeht nach jeder Einheit
+                  um die Schrittweite der Uebung; mal der tatsaechlichen
+                  Haeufigkeit ergibt das einen Zuwachs pro Tag.
+   viele Daten  → gemessene Ausgleichsgerade durch den echten Verlauf.
+
+   Dazwischen wird gemischt, mit steigendem Gewicht auf der Messung. Die
+   Prognose ist damit von Anfang an da und wird mit jeder Einheit schaerfer,
+   statt bis zu einer willkuerlichen Schwelle zu schweigen. */
+function goalForecast(g, ziel, standVon){
   const p = goalSeries(g);
-  if (p.length < PROG_MIN_PUNKTE) return {reif:false, fehlen:PROG_MIN_PUNKTE - p.length};
-  const spanne = (p[p.length-1].t - p[0].t) / 86400000;
-  if (spanne < PROG_MIN_TAGE) return {reif:false, tageFehlen:Math.ceil(PROG_MIN_TAGE - spanne)};
+  const stand = standVon !== undefined ? standVon
+                : (p.length ? p[p.length - 1].wert : 0);
+  const n = p.length;
 
-  const x = p.map(q => (q.t - p[0].t) / 86400000);
-  const y = p.map(q => q.wert);
-  const n = x.length;
-  const mx = x.reduce((a,b) => a+b, 0) / n;
-  const my = y.reduce((a,b) => a+b, 0) / n;
-  let zaehler = 0, nenner = 0;
-  for (let i = 0; i < n; i++) { zaehler += (x[i]-mx) * (y[i]-my); nenner += (x[i]-mx) * (x[i]-mx); }
-  const proTag = nenner ? zaehler / nenner : 0;
-  if (proTag <= 0) return {reif:true, steigend:false};
+  /* Erwartung aus dem Plan. Bei Wiederholungen gibt es keine Schrittweite —
+     eine Wiederholung alle drei Einheiten ist der Anfangswert, den die
+     Messung spaeter ersetzt. */
+  const proEinheit = g.kind === "reps" ? 1/3 : (incOf(g.ex) || 1);
+  const erwartet = proEinheit * (exFrequency(g.ex) || 2/7);
 
-  const stand = my + proTag * (x[n-1] - mx);
-  const tage = (ziel - stand) / proTag;
-  if (!isFinite(tage)) return {reif:true, steigend:false};
-  if (tage <= 0) return {reif:true, steigend:true, tage:0};
-  if (tage > 3 * 365) return {reif:true, steigend:true, zuWeit:true};
-  return {reif:true, steigend:true, tage:Math.round(tage),
-          datum:new Date(p[n-1].t + tage * 86400000)};
-}
-
-/* Ein Satz zur Prognose — oder ehrlich, was noch fehlt. */
-function goalForecastText(g, ziel){
-  const f = goalForecast(g, ziel);
-  if (!f.reif) {
-    return f.fehlen !== undefined
-      ? 'Prognose ab ' + PROG_MIN_PUNKTE + ' vergleichbaren Einheiten · noch ' + f.fehlen
-      : 'Prognose ab drei Wochen Verlauf · noch ' + f.tageFehlen + ' Tage';
+  /* Gemessene Steigung, sobald zwei vergleichbare Punkte ueber mindestens
+     einem Tag liegen. */
+  let gemessen = null;
+  if (n >= 2) {
+    const spanne = (p[n-1].t - p[0].t) / 86400000;
+    if (spanne >= 1) {
+      const x = p.map(q => (q.t - p[0].t) / 86400000);
+      const y = p.map(q => q.wert);
+      const mx = x.reduce((a,b) => a+b, 0) / n;
+      const my = y.reduce((a,b) => a+b, 0) / n;
+      let zaehler = 0, nenner = 0;
+      for (let i = 0; i < n; i++) { zaehler += (x[i]-mx)*(y[i]-my); nenner += (x[i]-mx)*(x[i]-mx); }
+      if (nenner) gemessen = zaehler / nenner;
+    }
   }
-  if (!f.steigend) return 'Noch kein messbarer Anstieg';
-  if (f.zuWeit) return 'Bei diesem Tempo dauert es über drei Jahre';
-  if (f.tage <= 0) return 'Etappe rechnerisch erreicht';
-  if (f.tage < 70) return 'Etwa in ' + Math.max(1, Math.round(f.tage / 7)) + ' Wochen';
-  return 'Etwa ' + MONATE[f.datum.getMonth()] + ' ' + f.datum.getFullYear();
+
+  /* Ab sechs vergleichbaren Einheiten zaehlt allein die Messung. */
+  const gewicht = Math.max(0, Math.min(1, (n - 1) / 5));
+  const proTag = gemessen === null ? erwartet : gemessen * gewicht + erwartet * (1 - gewicht);
+
+  const guete = n >= 6 ? "prognose" : n >= 3 ? "schaetzung" : "grob";
+  if (!(proTag > 0)) return {guete:guete, punkte:n, steigend:false};
+
+  const tage = (ziel - stand) / proTag;
+  if (!isFinite(tage) || tage <= 0) return {guete:guete, punkte:n, steigend:true, tage:0};
+  if (tage > 3 * 365) return {guete:guete, punkte:n, steigend:true, zuWeit:true};
+  return {guete:guete, punkte:n, steigend:true, tage:Math.round(tage),
+          datum:new Date(Date.now() + tage * 86400000)};
 }
 
+/* Ein Satz dazu. Das erste Wort sagt, wie belastbar die Zahl ist. */
+function goalForecastText(g, ziel, standVon){
+  const f = goalForecast(g, ziel, standVon);
+  const vorsatz = f.guete === "prognose" ? "Prognose" : f.guete === "schaetzung" ? "Schätzung" : "Grob geschätzt";
+  if (!f.steigend) return "Noch kein messbarer Anstieg";
+  if (f.zuWeit) return vorsatz + ": über drei Jahre";
+  if (f.tage <= 0) return "Etappe rechnerisch erreicht";
+  if (f.tage < 70) { const w = Math.max(1, Math.round(f.tage / 7));
+    return vorsatz + ": in " + w + (w === 1 ? " Woche" : " Wochen"); }
+  return vorsatz + ": " + MONATE[f.datum.getMonth()] + " " + f.datum.getFullYear();
+}
+
+/* Hauptziele.
+   Frueher: ein Balken zur naechsten Etappe und zwei Textzeilen. Damit war der
+   Weg unsichtbar — dass hinter "Etappe 8" noch 12, 16 und 20 kommen, stand
+   nur als Wort da. Jetzt ist die Leiter das Bauteil: eine Spur je Etappe,
+   erledigte gefuellt, die laufende angefangen, kommende dunkel. Man sieht auf
+   einen Blick, wo man steht und wie weit es noch ist. */
 function goalsCard(pr){
-  return '<div class="card">' + GOALS.map(g => {
+  return '<div class="card">' + GOALS.map((g, gi) => {
     const st = goalStep(g, pr);
-    return '<div class="goal"><div class="row"><span class="dim">'+g.label+'</span>'
-      + '<span class="num '+(st.done?"amber":"muted")+'">'+kg(st.value)+' / '+st.target+'</span></div>'
-      + '<div class="bar"><i class="'+(st.done?"done":"")+'" style="width:'+Math.min(100, st.target?st.value/st.target*100:0)+'%"></i></div>'
-      + '<div class="mini">'+(st.done ? 'Endziel erreicht' : 'Etappe '+st.target+' '+g.unit+' · Endziel '+st.final+' '+g.unit)+'</div>'
-      + (st.done ? '' : '<div class="gprog">'+goalForecastText(g, st.target)+'</div>')
-      + '</div>';
+    const wert = st.value;
+
+    /* Eine Spur je Etappe. Die Fuellung einer Spur ist der Anteil, der von
+       der vorigen Etappe bis zu dieser geschafft ist. */
+    let vorher = 0;
+    const spuren = g.steps.map((stufe, si) => {
+      const anteil = Math.max(0, Math.min(1, (wert - vorher) / (stufe - vorher)));
+      const laufend = anteil > 0 && anteil < 1;
+      vorher = stufe;
+      const verzoegerung = (gi * 0.09 + si * 0.07).toFixed(2);
+      return '<div class="g2seg'+(anteil >= 1 ? " voll" : laufend ? " jetzt" : "")+'">'
+        + '<i style="width:'+(anteil * 100).toFixed(1)+'%;--d:'+verzoegerung+'s"></i></div>';
+    }).join("");
+
+    const marken = g.steps.map(s => '<span>'+s+'</span>').join("");
+    const prognose = goalForecastText(g, st.target, st.value);
+    /* Eine echte Prognose ist ein Ergebnis und darf leuchten. Ein Hinweis,
+       dass noch Daten fehlen, ist Beiwerk und tritt zurueck. */
+    const reif = goalForecast(g, st.target, st.value).guete !== "grob";
+
+    return '<div class="goal2">'
+      + '<div class="g2head"><span class="g2name">'+g.label+'</span>'
+      + '<span class="g2val'+(st.done ? " amber" : "")+'">'+kg(wert)+'<small>'+g.unit+'</small></span></div>'
+      + '<div class="g2track">'+spuren+'</div>'
+      + '<div class="g2marks">'+marken+'</div>'
+      + '<div class="g2foot">'
+      + (st.done ? '<span class="amber">Endziel erreicht</span>'
+                 : '<span>Nächste Etappe '+st.target+' '+g.unit+'</span>'
+                   + '<span class="g2prog'+(reif ? " reif" : "")+'">'+prognose+'</span>')
+      + '</div></div>';
   }).join("") + '</div>';
 }
 
