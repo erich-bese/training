@@ -245,32 +245,47 @@
 
   /* Uebungszeichnung: zwei Bilder uebereinander, gegenlaeufig ein- und
      ausgeblendet. Beide gleichzeitig sichtbar zu lassen ergaebe ein Doppelbild. */
-  /* Zwei Standbilder werden erst dann zu einer Bewegung, wenn sich beim
-     Ueberblenden auch etwas verschiebt. Deshalb drei Aenderungen gegenueber
-     dem harten Schnitt von frueher:
-     — die Ueberblendung dauert fast die halbe Runde statt eines Wimpernschlags
-     — der Koerper hebt sich beim Zusammenziehen leicht und wird groesser
-     — die Kurve ist schnell hinein und langsam hinaus, wie eine echte Wiederholung
-     will-change hebt die Ebenen auf die Grafikkarte; ohne das ruckelt es auf
-     dem Geraet, weil die Zeichnungen aus vielen Pfaden bestehen. */
+  /* Zwei Standbilder, kein Zwischenbild moeglich: die beiden Frames sind
+     unabhaengig gezeichnet und haben nicht einmal dieselbe Pfadanzahl, es gibt
+     also nichts zu interpolieren. Auch verschieben laesst sich nichts — beim
+     Klimmzug steckt die Stange im selben Pfad wie der Koerper und wuerde
+     mitschweben.
+     Bleibt die Ueberblendung. Sie ist so eng wie moeglich gehalten: jedes Bild
+     steht gut vier Zehntel der Runde fuer sich, das Doppelbild dauert nur den
+     kurzen Rest. Weicher als ein Schnitt, ohne lange zwei Koerper zu zeigen.
+     will-change hebt die Ebenen auf die Grafikkarte, sonst ruckelt es auf dem
+     Geraet — die Zeichnungen bestehen aus sehr vielen Pfaden. */
   .exart{
     position:relative; width:var(--w,44px); height:var(--h,58px); flex-shrink:0;
     color:var(--bone); opacity:.92;
-    animation:artMove 2.2s cubic-bezier(.42,.03,.34,1) infinite alternate;
-    will-change:transform;
   }
   .exart svg{position:absolute; inset:0; width:100%; height:100%; will-change:opacity}
-  .exart .f1{animation:artA 2.2s cubic-bezier(.42,.03,.34,1) infinite alternate}
-  .exart .f2{animation:artB 2.2s cubic-bezier(.42,.03,.34,1) infinite alternate}
-  @keyframes artA{0%,26%{opacity:1} 74%,100%{opacity:0}}
-  @keyframes artB{0%,26%{opacity:0} 74%,100%{opacity:1}}
-  @keyframes artMove{0%,18%{transform:none} 100%{transform:translateY(-3%) scale(1.045)}}
+  .exart .f1{animation:artA 2.4s cubic-bezier(.45,0,.55,1) infinite alternate}
+  .exart .f2{animation:artB 2.4s cubic-bezier(.45,0,.55,1) infinite alternate}
+  @keyframes artA{0%,42%{opacity:1} 58%,100%{opacity:0}}
+  @keyframes artB{0%,42%{opacity:0} 58%,100%{opacity:1}}
 
   /* Muskelkarte: die belasteten Gruppen leuchten nacheinander auf, statt
      fertig dazustehen. Nur bei echtem Ansichtswechsel — sonst flackert die
      Karte bei jeder Eingabe. */
   @keyframes mgIn{from{opacity:.28} to{opacity:1}}
   .anim .bodies .mg{animation:mgIn .6s var(--ease) both; animation-delay:var(--d,0s)}
+
+  /* Balken und Saeulen wachsen aus dem Nichts, statt fertig dazustehen.
+     Ueber transform statt width/height, damit nichts neu umbrochen wird —
+     die inline gesetzten Werte bleiben unangetastet. Ebenfalls nur beim
+     Ansichtswechsel. */
+  @keyframes barGrow{from{transform:scaleX(0)} to{transform:scaleX(1)}}
+  @keyframes colGrow{from{transform:scaleY(0)} to{transform:scaleY(1)}}
+  .anim .bar i,.anim .mbar i{
+    transform-origin:left center; animation:barGrow .7s var(--ease) both; animation-delay:.14s;
+  }
+  .anim .weeks b{transform-origin:bottom center; animation:colGrow .55s var(--ease) both}
+  .anim .weeks b:nth-child(1){animation-delay:.10s}
+  .anim .weeks b:nth-child(2){animation-delay:.15s}
+  .anim .weeks b:nth-child(3){animation-delay:.20s}
+  .anim .weeks b:nth-child(4){animation-delay:.25s}
+  .anim .weeks b:nth-child(n+5){animation-delay:.30s}
 
   @media (prefers-reduced-motion:reduce){
     .exart,.exart .f1,.exart .f2{animation:none}
@@ -626,7 +641,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "4.7";
+const APP_VERSION = "4.9";
 
 /* ================================================================== icons */
 const I = {
@@ -1349,10 +1364,38 @@ let restTick = null;
 /* Die Einblend-Animation darf nur bei einem echten Ansichtswechsel laufen.
    Sonst zuckt die ganze Seite bei jedem Tippen, weil render() alles neu baut. */
 let lastViewKey = null;
+/* Zahlen laufen beim Ansichtswechsel hoch. Kein Markup noetig: gesucht werden
+   die Stellen, an denen ohnehin nur eine ganze Zahl steht. render() bleibt
+   synchron — das Hochzaehlen laeuft danach ueber die Bildwiederholung. */
+function countUp(root){
+  root.querySelectorAll(".hs-v, .stat .big").forEach(el => {
+    const node = el.firstChild;
+    if (!node || node.nodeType !== 3) return;
+    const text = node.nodeValue.trim();
+    if (!/^\d+$/.test(text)) return;
+    const ziel = +text;
+    if (ziel < 2) return;                       /* unter zwei lohnt es nicht */
+    const dauer = Math.min(850, 280 + ziel * 40);
+    /* Die Null wird erst im ersten Bild gesetzt, nicht vorher. Laeuft die
+       Bildwiederholung nicht — Seite im Hintergrund, gedrosselte Webansicht,
+       Testbrowser —, bleibt schlicht die richtige Zahl stehen. Andersherum
+       stuende dort fuer immer eine Null. */
+    let start = 0;
+    const schritt = jetzt => {
+      if (!start) start = jetzt;
+      const p = Math.min(1, (jetzt - start) / dauer);
+      node.nodeValue = String(Math.round(ziel * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(schritt);
+    };
+    requestAnimationFrame(schritt);
+  });
+}
+
 const setHTML = (html, flat, key) => {
   const fresh = key !== lastViewKey;
   lastViewKey = key;
   app.innerHTML = '<div class="wrap'+(flat?" flat":"")+(fresh?" anim":"")+'">' + html + '</div>';
+  if (fresh) countUp(app);
 };
 const toTop = () => { scroller.scrollTop = 0; };
 
