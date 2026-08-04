@@ -268,6 +268,9 @@
   .g2when.langsamer{color:var(--red); font-weight:600}
   .g2when.gleichbleibend{color:var(--muted)}
   /* Widerspruch zwischen Ziel und Plan — der gehoert nicht weggegraut. */
+  .g2seg.ueber{background:rgba(255,255,255,.03); border:1px dashed rgba(255,255,255,.14)}
+  .g2geraet{margin-top:2px}
+  .g2geraet span{font-size:11.5px; color:var(--muted); line-height:1.45}
   .g2warn{margin-top:2px}
   .g2warn span{
     font-size:11.5px; color:var(--red); line-height:1.45;
@@ -761,7 +764,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "6.8";
+const APP_VERSION = "6.9";
 
 /* ================================================================== icons */
 const I = {
@@ -959,11 +962,11 @@ const GOALS = [
    steps:[10,20,30,40,50]},
   {label:"Dips mit Zusatz",     unit:"kg",   kind:"load", ex:"dips",     reps:10,
    steps:[5,15,25,40,50]},
-  {label:"Bankdrücken",         unit:"kg",   kind:"load", ex:"bench",    reps:5,
+  {label:"Bankdrücken",         unit:"kg",   kind:"load", ex:"bench",    reps:5, geraet:100,
    steps:[60,80,100,120,140]},
-  {label:"Kniebeuge",           unit:"kg",   kind:"load", ex:["squat","squat_light"], reps:5,
+  {label:"Kniebeuge",           unit:"kg",   kind:"load", ex:["squat","squat_light"], reps:5, geraet:100,
    steps:[50,80,110,140,170]},
-  {label:"Kreuzheben",          unit:"kg",   kind:"load", ex:["deadlift","dl_light"], reps:5,
+  {label:"Kreuzheben",          unit:"kg",   kind:"load", ex:["deadlift","dl_light"], reps:5, geraet:100,
    steps:[90,120,150,180,210]}
 ];
 
@@ -1842,7 +1845,11 @@ function goalsCard(pr){
       const laufend = anteil > 0 && anteil < 1;
       vorher = stufe;
       const verzoegerung = (gi * 0.09 + si * 0.07).toFixed(2);
-      return '<div class="g2seg'+(anteil >= 1 ? " voll" : laufend ? " jetzt" : "")+'">'
+      /* Ueber der Belastungsgrenze des Geraets: die Stufe bleibt stehen, wird
+         aber als das gekennzeichnet, was sie ist — nur mit anderem Gerät. */
+      const ueber = g.geraet && stufe > g.geraet;
+      return '<div class="g2seg'+(anteil >= 1 ? " voll" : laufend ? " jetzt" : "")
+             +(ueber ? " ueber" : "")+'">'
         + '<i style="width:'+(anteil * 100).toFixed(1)+'%;--d:'+verzoegerung+'s"></i></div>';
     }).join("");
 
@@ -1871,6 +1878,10 @@ function goalsCard(pr){
                  + (tempo.richtung ? '<span class="g2when '+tempo.richtung+'">'+tempo.richtung+'</span>' : '')
                  + '</div>' : '')
       + (passt ? '<div class="g2row g2warn"><span>'+passt.text+'</span></div>' : '')
+      + (g.geraet && st.final > g.geraet
+          ? '<div class="g2row g2geraet"><span>Ab '+g.geraet+' kg endet das Gym Monster '
+            + '(100 kg gesamt, 50 je Arm) — die letzten Stufen brauchen eine Langhantel.</span></div>'
+          : '')
       + '</div></div>';
   }).join("")
   + '<div class="g2note">Zeitangaben sind Schätzungen und werden mit jeder '
