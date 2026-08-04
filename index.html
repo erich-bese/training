@@ -95,6 +95,9 @@
   }
   .card.tight{padding:15px 17px}
   .card+.card{margin-top:9px}
+  /* Nebeneinander im Raster darf der Abstand nicht greifen: er schiebt die
+     zweite Karte nach unten und macht sie um denselben Betrag kürzer. */
+  .grid2 .card+.card{margin-top:0}
   .stack{margin-bottom:26px}
   .hair{height:1px; background:var(--line); margin:14px -19px}
   .hair.inset{margin:13px 0}
@@ -179,6 +182,7 @@
   .stat .lbl{
     color:var(--muted); font-size:10.5px; letter-spacing:.13em; text-transform:uppercase;
     font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:7px;
+    white-space:nowrap; min-height:13px;
   }
   .stat .lbl svg{width:13px; height:13px; stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round}
   .stat .big{font-size:33px; font-weight:600; letter-spacing:-.05em; line-height:1}
@@ -225,12 +229,15 @@
   .exhead .var{color:var(--dim); font-size:12.5px; margin-top:4px}
   .exhead .sub{color:var(--muted); font-size:12.5px; margin-top:4px}
   .exhead .badges{display:flex; gap:5px; flex-wrap:wrap; margin-top:8px}
-  .ghost{
+  /* Zeile "Letztes Mal" im Training. Frueher hiess sie .ghost und kollidierte
+     damit mit den Ghost-Buttons: die erbten display:flex, 11,5px Schrift und
+     falsches Padding quer durch die App. */
+  .lasttime{
     display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--muted);
     margin-top:9px; padding-top:9px; border-top:1px dashed var(--line);
   }
-  .ghost b{font-family:var(--mono); font-weight:500; letter-spacing:-.03em; color:var(--dim)}
-  .ghost svg{width:14px; height:14px; flex-shrink:0; stroke:currentColor; stroke-width:1.8;
+  .lasttime b{font-family:var(--mono); font-weight:500; letter-spacing:-.03em; color:var(--dim)}
+  .lasttime svg{width:14px; height:14px; flex-shrink:0; stroke:currentColor; stroke-width:1.8;
              fill:none; stroke-linecap:round; stroke-linejoin:round}
 
   /* ---- calendar ---- */
@@ -471,7 +478,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "3.3";
+const APP_VERSION = "3.4";
 
 /* ================================================================== icons */
 const I = {
@@ -1331,8 +1338,9 @@ function viewHeute(){
     + (recPlan ? (recPlan.type==="Beine"?"amber":recPlan.type==="Pull"?"cool":"") : "muted") + '">'
     + (recPlan ? esc(recPlan.type) : 'Pause')
     + '</div>'
-    + (recPlan && detail !== recPlan.title ? '<div class="sub">'+esc(detail)+'</div>'
-       : recPlan ? '<div class="sub">'+esc(recPlan.title)+'</div>' : '')
+    /* Untertitel nur, wenn er etwas hinzufuegt: bei "Ganzkoerper" ist der Titel
+       schon der Typ, dann stuende das Wort sonst zweimal untereinander. */
+    + (recPlan && detail && detail !== recPlan.type ? '<div class="sub">'+esc(detail)+'</div>' : '')
     + '</div>';
 
   if (!storageOk) h += '<div class="banner warn">'+I.info+'<span>Der Browser speichert gerade nichts – im privaten Modus bleibt nichts erhalten. Öffne die App normal oder sichere über Mehr › Backup.</span></div>';
@@ -1546,7 +1554,7 @@ function viewSessionDetail(id){
       + '</div></div>'
       + '<div class="num dim" style="font-size:15px;letter-spacing:-.02em">'+e.reps.join(' · ')+'</div>'
       + (e.note ? '<div class="note" style="margin-top:9px">'+esc(e.note)+'</div>' : '')
-      + (c ? '<div class="ghost">'+I.clock+'<span>Letztes Mal <b>'+c.reps.join('·')+'</b> @ <b>'+kg(c.weight)+' kg</b></span></div>' : '')
+      + (c ? '<div class="lasttime">'+I.clock+'<span>Letztes Mal <b>'+c.reps.join('·')+'</b> @ <b>'+kg(c.weight)+' kg</b></span></div>' : '')
       + '</div>';
   }).join("");
   h += '</div>';
@@ -1814,7 +1822,7 @@ function viewSession(){
       + '</div>'
       + '<div data-sets="'+e.id+'">' + rows.map((s,i) => setRow(e, s, i)).join("") + '</div>'
       + '<button class="addset" data-a="addset" data-id="'+e.id+'">+ Satz</button>'
-      + (le ? '<div class="ghost">'+I.clock+'<span>Letztes Mal <b>'+le.entry.reps.join('·')+'</b> @ <b>'
+      + (le ? '<div class="lasttime">'+I.clock+'<span>Letztes Mal <b>'+le.entry.reps.join('·')+'</b> @ <b>'
           + (le.entry.bw && !le.entry.weight ? 'KG' : kg(le.entry.weight)+' kg')+'</b> · '+dateShort(le.session.date)+'</span></div>' : '')
       + '</div>';
   }).join("");
