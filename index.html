@@ -484,7 +484,34 @@
 
   /* Kompakte Muskelkarte fuer die Startseite: dort zaehlt der schnelle Blick,
      die grosse Ansicht bleibt der Auswertung vorbehalten. */
-  .bodies.klein .body{max-width:118px}
+  .bodies.klein .body{max-width:134px}
+  /* Klebt unter der Statusleiste. Der Verlauf darunter verhindert, dass
+     durchscrollender Inhalt an der Kante hart abgeschnitten wirkt. */
+  .sesshead{
+    position:sticky; top:calc(env(safe-area-inset-top) - 2px); z-index:25;
+    padding-top:6px; margin:0 -20px 9px; padding-left:20px; padding-right:20px;
+    background:linear-gradient(to bottom, var(--bg) 74%, rgba(8,9,10,0));
+    padding-bottom:14px;
+  }
+  .sesshead .card{padding:15px 17px 13px}
+  .shrow{display:flex; align-items:center; gap:15px}
+  .shtitle{font-size:18px; font-weight:660; letter-spacing:-.025em; white-space:nowrap;
+           overflow:hidden; text-overflow:ellipsis}
+  .shdots{display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:12px; padding-top:11px;
+          border-top:1px solid var(--line)}
+  .shdot{display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted);
+         letter-spacing:.01em}
+  .shdot i{width:7px; height:7px; border-radius:4px; display:block; flex-shrink:0}
+  /* In der Kopfzeile ist der Balken keine schwebende Leiste mehr, sondern
+     eine Zeile — Rahmen, Schatten und feste Position fallen weg. */
+  #restslot:empty{display:none}
+  #restslot .restbar{position:static; padding:0; background:none; display:block; margin-top:12px}
+  #restslot .restbar .inner{
+    background:rgba(233,166,60,.10); border:1px solid var(--on-line);
+    box-shadow:none; animation:none; padding:10px 13px; max-width:none;
+  }
+  #restslot .restbar .t{font-size:19px}
+  .sessbody .bodies.klein .body{max-width:104px}
   .sessbody{padding:15px 19px 13px}
   .sessbody .bodies .cap{display:none}
   .bodies.klein .cap{margin-top:7px; font-size:9.5px}
@@ -779,7 +806,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "7.3";
+const APP_VERSION = "7.5";
 
 /* ================================================================== icons */
 const I = {
@@ -2036,7 +2063,7 @@ const LV_RGB = {
 };
 const rgbCss = a => 'rgb('+a[0]+','+a[1]+','+a[2]+')';
 
-function silhouette(st){
+function silhouette(st, kompakt){
   const by = muscleMap(st);
   /* Feste Reihenfolge der Gruppen ergibt eine gleichbleibende Staffelung —
      die Karte leuchtet immer im selben Rhythmus auf. */
@@ -2054,7 +2081,7 @@ function silhouette(st){
   const front = figure(BODY_FRONT, "0 0 35 93");
   const back = figure(BODY_BACK, "37 0 35 93");
 
-  return '<div class="bodies">'
+  return '<div class="bodies'+(kompakt ? " klein" : "")+'">'
     + '<div class="body">' + front + '<div class="cap">Vorn</div></div>'
     + '<div class="body">' + back + '<div class="cap">Hinten</div></div>'
     + '</div>'
@@ -2151,7 +2178,7 @@ function viewHeute(){
      Startseite frueher zur Haelfte gefuellt. */
   h += '<div class="stack"><div class="eyebrow"><span>Beanspruchte Muskelgruppen</span>'
     + '<span class="faint">' + rec.state.filter(x => x.level === "rot").length + ' belastet</span></div>'
-    + '<div class="card"><div class="bodies klein">' + silhouette(rec.state) + '</div></div></div>';
+    + '<div class="card">' + silhouette(rec.state, true) + '</div></div>';
 
   /* Die Daten liegen nur auf diesem Geraet. Ohne Erinnerung faellt ein fehlendes
      Backup erst auf, wenn es zu spaet ist. */
@@ -2692,6 +2719,14 @@ function viewPlanEdit(id){
    an dem, was der ganze Plan bringen wuerde. Damit fuellt sich die Figur ueber
    die Einheit hinweg von grau nach rot: man sieht die eigene Arbeit entstehen,
    statt nur Haken zu setzen. */
+/* Muskelgruppen als Punktreihe: in der klebenden Kopfzeile ist kein Platz
+   fuer zwei Figuren, die Farbe allein traegt die Information aber schon. */
+function muscleDots(st){
+  return st.filter(x => x.level !== "neutral").map(x =>
+    '<span class="shdot"><i style="background:'+rgbCss(LV_RGB[x.level])+'"></i>'
+    + MUSCLE_LABEL[x.id] + '</span>').join("");
+}
+
 function sessionBodyState(){
   const a = S.active, plan = planOf(a.plan);
   const best = prsFrom(S.sessions);
@@ -2750,18 +2785,25 @@ function viewSession(){
   let h = '<div class="topbar"><button class="back" data-a="cancel">'+I.left+' Abbrechen</button>'
     + '<span class="tag" id="duel">'+duelLabel(cur, ref)+'</span></div>';
 
-  h += '<div class="card stack" style="display:flex;align-items:center;gap:16px">'
+  /* Beim Scrollen durch die Saetze verschwand bisher alles, woran man sich
+     orientiert: Plan, Zeit, Restzeit, Satzzahl, Muskeln. Die Kopfzeile bleibt
+     deshalb oben stehen und traegt genau das — die Muskelgruppen als Punkte,
+     weil die Figuren dafuer zu hoch sind. */
+  h += '<div class="sesshead"><div class="card">'
+    + '<div class="shrow">'
     + '<svg class="ring" viewBox="0 0 52 52"><circle class="trk" cx="26" cy="26" r="'+ringR+'"/>'
     + '<circle class="val" id="ring" cx="26" cy="26" r="'+ringR+'" stroke-dasharray="'+circ.toFixed(1)+'" '
     + 'stroke-dashoffset="'+(circ * (1 - (total?done/total:0))).toFixed(1)+'"/></svg>'
-    + '<div style="flex:1"><div style="font-size:19px;font-weight:660;letter-spacing:-.025em">'+esc(plan.title)+'</div>'
+    + '<div style="flex:1;min-width:0">'
+    + '<div class="shtitle">'+esc(plan.title)+'</div>'
     + '<div class="note" style="margin-top:3px"><span id="cnt">'+done+' / '+total+'</span> Sätze · '
     + '<span id="elapsed">'+elapsedText()+'</span> · noch <span id="uebrig">'+sessionLeftMin()+'</span> min'
-    + '</div></div></div>';
+    + '</div></div></div>'
+    + '<div class="shdots" id="shdots">'+muscleDots(sessionBodyState())+'</div>'
+    + '<div id="restslot"></div>'
+    + '</div></div>';
 
   /* Die Arbeit sichtbar machen, waehrend sie passiert. */
-  h += '<div class="card stack sessbody"><div class="bodies klein" id="sessbody">'
-    + silhouette(sessionBodyState()) + '</div></div>';
 
   h += plan.ex.map(e => {
     const rows = a.sets[e.id] || [];
@@ -2810,6 +2852,12 @@ function viewSession(){
           + '</span></div>' : '')
       + '</div>';
   }).join("");
+
+  /* Die Figur steht am Ende, nicht am Anfang: oben wuerde sie den Weg zu den
+     Saetzen versperren, und die Punkte in der Kopfzeile sagen waehrend der
+     Einheit dasselbe. Unten ist sie das Bild der geleisteten Arbeit. */
+  h += '<div class="stack"><div class="eyebrow"><span>Geleistet</span></div>'
+    + '<div class="card sessbody" id="sessbody">' + silhouette(sessionBodyState(), true) + '</div></div>';
 
   h += '<div style="margin-top:22px"><button class="btn" data-a="finish"'+(done?"":" disabled")+'>Training abschließen</button></div>';
   return h;
@@ -2872,23 +2920,28 @@ let restDone = false;
    er jede Sekunde komplett neu erzeugt — dadurch lief die Einblend-Animation
    im Sekundentakt neu, das war das Flackern des Countdowns. */
 function renderRest(){
-  if (!S.active || !S.rest) { restEl.innerHTML = ""; return; }
+  /* Waehrend einer Einheit gehoert die Pause nach oben zur Kopfzeile: dort
+     steht schon alles andere, und beim Scrollen durch die Saetze bleibt sie
+     sichtbar. Ohne laufende Einheit bleibt der schwebende Balken unten. */
+  const ziel = document.getElementById("restslot") || restEl;
+  if (ziel !== restEl) restEl.innerHTML = "";
+  if (!S.active || !S.rest) { ziel.innerHTML = ""; return; }
   const left = restLeft();
   const over = left <= 0;
   const totalSec = S.rest.total || S.settings.rest || 1;
   const frac = Math.max(0, Math.min(1, left / totalSec));
   const m = Math.floor(left/60), sec = String(left%60).padStart(2,"0");
 
-  let bar = restEl.querySelector(".restbar");
+  let bar = ziel.querySelector(".restbar");
   if (!bar) {
-    restEl.innerHTML = '<div class="restbar"><div class="inner" style="position:relative">'
+    ziel.innerHTML = '<div class="restbar"><div class="inner" style="position:relative">'
       + '<div class="muted" id="restlbl" style="display:flex;align-items:center;gap:9px;font-size:12.5px">'
       + I.timer + '<span>Pause</span></div>'
       + '<div class="t num" id="restt">0:00</div>'
       + '<button class="tag" data-a="skiprest" id="restbtn">Fertig</button>'
       + '<div class="prog"><i id="restprog" style="display:block;height:100%;background:var(--amber);transition:width 1s linear"></i></div>'
       + '</div></div>';
-    bar = restEl.querySelector(".restbar");
+    bar = ziel.querySelector(".restbar");
   }
   bar.classList.toggle("over", over);
   const t = document.getElementById("restt");
@@ -3856,9 +3909,11 @@ function sessionProgress(){
    Einheit wuerde Eingabefokus und Scrollstand verlieren. */
 function updateBody(){
   const el = document.getElementById("sessbody");
-  if (el && S.active) el.innerHTML = silhouette(sessionBodyState());
+  if (el && S.active) el.innerHTML = silhouette(sessionBodyState(), true);
   const u = document.getElementById("uebrig");
   if (u && S.active) u.textContent = sessionLeftMin();
+  const d = document.getElementById("shdots");
+  if (d && S.active) d.innerHTML = muscleDots(sessionBodyState());
 }
 
 function updateCount(){
