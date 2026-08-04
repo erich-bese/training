@@ -267,6 +267,12 @@
   .g2when.schneller{color:var(--lv-gruen); font-weight:600}
   .g2when.langsamer{color:var(--red); font-weight:600}
   .g2when.gleichbleibend{color:var(--muted)}
+  /* Widerspruch zwischen Ziel und Plan — der gehoert nicht weggegraut. */
+  .g2warn{margin-top:2px}
+  .g2warn span{
+    font-size:11.5px; color:var(--red); line-height:1.45;
+    border-left:2px solid rgba(201,106,90,.5); padding-left:9px;
+  }
   .goal2{border-radius:12px; transition:transform .13s var(--ease)}
   .goal2:active{transform:scale(.99)}
   .g3chart{width:100%; height:92px; display:block; margin:4px 0 18px; overflow:visible}
@@ -755,7 +761,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "6.7";
+const APP_VERSION = "6.8";
 
 /* ================================================================== icons */
 const I = {
@@ -1800,6 +1806,29 @@ function goalPace(g, standVon){
   return {text:text, richtung:richtung};
 }
 
+/* Passt der Plan ueberhaupt zum Ziel?
+   Ein Lastziel mit zehn Wiederholungen ist unerreichbar, wenn die Uebung im
+   Plan nur mit zwei bis fuenf steht — dann kann man jahrelang trainieren,
+   ohne dass sich am Ziel je etwas bewegt. Dasselbe gilt fuer ein
+   Wiederholungsziel, dessen erste Etappe ueber der geplanten Satzlaenge
+   liegt. Die App sagt das jetzt, statt es den Nutzer merken zu lassen. */
+function goalPlanFit(g){
+  const noetig = g.kind === "load" ? goalReps(g) : g.steps[0];
+  let hoechste = 0, kommtVor = false;
+  Object.keys(plans()).forEach(pid => {
+    (planOf(pid).ex || []).forEach(e => {
+      if (goalEx(g).indexOf(e.id) < 0) return;
+      kommtVor = true;
+      hoechste = Math.max(hoechste, +e.max || +e.min || 0);
+    });
+  });
+  if (!kommtVor) return {text:"Kommt in keinem Plan vor"};
+  if (hoechste < noetig) {
+    return {text:"Plan sieht nur bis " + hoechste + " Wdh. vor — Ziel verlangt " + noetig};
+  }
+  return null;
+}
+
 function goalsCard(pr){
   return '<div class="card">' + GOALS.map((g, gi) => {
     const st = goalStep(g, pr);
@@ -1818,6 +1847,7 @@ function goalsCard(pr){
     }).join("");
 
     const tempo = goalPace(g, st.value);
+    const passt = goalPlanFit(g);
     const marken = g.steps.map(s => '<span>'+s+'</span>').join("");
     /* Je Zeile: was, wie viel, wann. Eine belastbare Angabe leuchtet, eine
        grobe tritt zurueck. */
@@ -1840,6 +1870,7 @@ function goalsCard(pr){
                  + '<span class="g2zt">'+tempo.text+'</span>'
                  + (tempo.richtung ? '<span class="g2when '+tempo.richtung+'">'+tempo.richtung+'</span>' : '')
                  + '</div>' : '')
+      + (passt ? '<div class="g2row g2warn"><span>'+passt.text+'</span></div>' : '')
       + '</div></div>';
   }).join("")
   + '<div class="g2note">Zeitangaben sind Schätzungen und werden mit jeder '
