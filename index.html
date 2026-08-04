@@ -143,14 +143,29 @@
     border-top:1px solid var(--line);
   }
   .hstat{display:flex; flex-direction:column; gap:3px}
+  /* Feste Zeilenhoehe statt line-height:1. Damit sitzen alle Werte auf
+     derselben Grundlinie, auch wenn einer kleiner gesetzt ist — bei
+     line-height:1 haengt die Grundlinie an der Schriftgroesse und ein
+     kleinerer Wert rutscht nach oben. */
+  /* Feste Hoehe und gemeinsame Grundlinie statt Inline-Metrik: bei einer
+     Inline-Spanne bestimmt die Schrift die Boxhoehe, und die angehaengte
+     Einheit zieht sie zusaetzlich auseinander. Beides zusammen hat die dritte
+     Spalte gegenueber den anderen nach oben versetzt. */
   .hstat .hs-v{
+    display:flex; align-items:baseline; height:30px;
     font-size:25px; font-weight:700; letter-spacing:-.045em; line-height:1;
     font-family:var(--sans); font-variant-numeric:tabular-nums;
   }
-  .hstat .hs-v small{font-size:12.5px; font-weight:600; color:var(--muted); margin-left:3px; letter-spacing:0}
-  /* Ein Wort an Stelle einer Zahl traegt bei gleicher Groesse deutlich mehr
-     Gewicht. Kleiner gesetzt steht es wieder auf einer Stufe mit den Zahlen. */
-  .hstat .hs-v.word{font-size:19px; font-weight:660; letter-spacing:-.03em}
+  .hstat .hs-v small{
+    font-size:12.5px; font-weight:600; color:var(--muted);
+    margin-left:3px; letter-spacing:0; line-height:1;
+  }
+  /* Ein Wort traegt bei gleicher Groesse mehr Gewicht als eine Zahl. Es wird
+     deshalb leichter gesetzt — aber nicht kleiner: bei einer Inline-Spanne
+     richtet sich die Boxhoehe nach der Schriftgroesse und nicht nach der
+     Zeilenhoehe. Eine zweite Groesse haette die Grundlinien auseinander
+     gezogen und die Beschriftung darunter mitgenommen. */
+  .hstat .hs-v.word{font-weight:590; letter-spacing:-.035em}
   .hstat .hs-l{
     font-size:9.5px; letter-spacing:.15em; text-transform:uppercase;
     color:var(--faint); font-weight:640;
@@ -641,7 +656,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "4.9";
+const APP_VERSION = "5.0";
 
 /* ================================================================== icons */
 const I = {
