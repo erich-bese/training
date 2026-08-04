@@ -528,7 +528,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "4.0";
+const APP_VERSION = "4.1";
 
 /* ================================================================== icons */
 const I = {
@@ -1879,8 +1879,16 @@ function viewMehr(){
     + '<button class="btn ghost" data-a="import">Backup einspielen</button>'
     + '<button class="btn danger" data-a="reset" style="margin-top:10px">Alles zurücksetzen</button>'
     + '<div class="note" id="msg" style="padding:13px 4px 0"></div></div>'
-    + '<div class="note" style="padding:0 4px 20px">Alles liegt auf diesem Gerät. Kein Konto, keine Cloud, kein Server. '
+    + '<div class="note" style="padding:0 4px 8px">Alles liegt auf diesem Gerät. Kein Konto, keine Cloud, kein Server. '
     + 'Beim Einspielen kannst du wählen, ob zusammengeführt oder ersetzt wird.</div>'
+    + '<div class="card tight" style="margin-bottom:20px"><div class="row">'
+    + '<span class="note" style="flex:1;padding-right:12px">Speicher gegen automatisches Aufräumen geschützt</span>'
+    + '<span class="tag'+(storagePersisted === true ? " on" : "")+'">'
+    + (storagePersisted === true ? "Ja" : storagePersisted === false ? "Nein" : "Unbekannt")
+    + '</span></div>'
+    + '<div class="note" style="margin-top:9px">iOS löscht Websitedaten, wenn der Speicher knapp wird oder '
+    + 'eine App länger nicht benutzt wurde. Der Schutz verhindert das, ersetzt aber kein Backup: '
+    + 'geht das Gerät verloren, sind die Daten weg.</div></div>'
 
     + '<div class="stack"><div class="eyebrow"><span>Version</span><span class="faint num">'+APP_VERSION+'</span></div>'
     + '<button class="btn ghost" data-a="update">Auf Update prüfen</button>'
@@ -2145,6 +2153,21 @@ function beep(){
       o.start(t); o.stop(t + 0.24);
     });
   } catch(e){}
+}
+
+/* iOS raeumt Websitedaten auf, wenn der Platz knapp wird oder eine App laenger
+   nicht benutzt wurde. Diese Anfrage bittet um Schutz davor. Sie ersetzt kein
+   Backup — gegen ein verlorenes Geraet hilft sie nicht —, nimmt aber die
+   haeufigere Gefahr weg. Safari beantwortet sie erst nach echter Nutzung. */
+let storagePersisted = null;
+function askPersist(){
+  try {
+    if (!navigator.storage || !navigator.storage.persist) { storagePersisted = "nicht unterstützt"; return; }
+    navigator.storage.persisted().then(p => {
+      if (p) { storagePersisted = true; return; }
+      return navigator.storage.persist().then(ok => { storagePersisted = !!ok; });
+    }).catch(() => { storagePersisted = null; });
+  } catch(e) { storagePersisted = null; }
 }
 
 /* Tage seit dem letzten Backup; 999 heisst: noch nie eines gezogen. */
@@ -2994,6 +3017,7 @@ function updateDuel(){
 
 /* ================================================================== boot */
 load();
+askPersist();
 render();
 tickRest();
 if ("serviceWorker" in navigator) {
