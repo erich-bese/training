@@ -229,6 +229,17 @@
   .goal .row{margin-bottom:9px; font-size:13.5px}
   /* ---- Hauptziele: die Etappen als Leiter ---- */
   .goal2 + .goal2{margin-top:22px; padding-top:22px; border-top:1px solid var(--line)}
+  /* Zeichnung links, Leiter rechts. Die Figur steht neben Kopf, Spuren und
+     Marken, die Fusszeile laeuft darunter ueber die volle Breite — sonst
+     bliebe rechts eine schmale Spalte fuer die Zeitangaben uebrig. */
+  .g2top{display:flex; gap:14px; align-items:flex-start}
+  .g2main{flex:1; min-width:0}
+  /* Der Versatz je Ziel steckt in --v: dieselbe Ueberblendung, nur zeitlich
+     verschoben. Negativer Verzug, damit keine Figur beim Oeffnen der Seite
+     erst wartet. */
+  .g2art .exart svg{animation-delay:calc(0s - var(--v,0s))}
+  .g2art .exart{opacity:.8}
+  .g2art .exart.on{opacity:1}
   .g2head{display:flex; justify-content:space-between; align-items:baseline; gap:12px}
   .g2name{font-size:15px; font-weight:600; letter-spacing:-.018em; color:var(--bone)}
   .g2val{
@@ -855,7 +866,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.2";
+const APP_VERSION = "8.3";
 
 /* ================================================================== icons */
 const I = {
@@ -2303,11 +2314,23 @@ function goalsCard(pr){
         + '<span class="g2when'+(w.reif ? " reif" : "")+'">'+w.text+'</span></div>';
     };
 
+    /* Die Bewegung, um die es geht — als Zeichnung neben der Leiter. Ohne sie
+       stand hier eine Tabelle aus Zahlen; jetzt sieht man auf einen Blick,
+       welches Ziel welches ist. Die Uebergaenge laufen bewusst versetzt: alle
+       sieben Figuren im Gleichtakt saehen aus wie ein Fehler. Ist die Etappe
+       erreicht, faerbt die Figur mit ein (`on`), genau wie die laufende Spur. */
+    const zielEx = Array.isArray(g.ex) ? g.ex[0] : g.ex;
+    const bild = exArt(zielEx, 46, 61, st.done ? "on" : "");
+
     return '<div class="goal2" data-a="goalzoom" data-id="'+gi+'">'
+      + '<div class="g2top">'
+      + (bild ? '<div class="g2art" style="--v:'+(gi * 0.31).toFixed(2)+'s">'+bild+'</div>' : '')
+      + '<div class="g2main">'
       + '<div class="g2head"><span class="g2name">'+g.label+'</span>'
       + '<span class="g2val'+(st.done ? " amber" : "")+'">'+kg(wert)+'<small>'+g.unit+'</small></span></div>'
       + '<div class="g2track">'+spuren+'</div>'
       + '<div class="g2marks">'+marken+'</div>'
+      + '</div></div>'
       + '<div class="g2foot">' + zeile('Nächste Etappe', st.target, st.target)
       + (st.final !== st.target ? zeile('Endziel', st.final, st.final) : '')
       + (tempo ? '<div class="g2row"><span class="g2lbl">Tempo</span>'
