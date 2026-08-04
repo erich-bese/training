@@ -385,10 +385,9 @@
   .bodies .body svg{width:100%; height:auto; display:block; overflow:visible}
   .bodies .cap{color:var(--faint); font-size:10px; letter-spacing:.12em;
                text-transform:uppercase; margin-top:10px; font-weight:600}
-  /* neutrale Partien: Kopf, Unterarme, Schienbeine — sie tragen keine Aussage */
-  .bodies .neutral{fill:rgba(255,255,255,.055); stroke:rgba(255,255,255,.15); stroke-width:1.2}
-  .bodies .reg{stroke:rgba(255,255,255,.2); stroke-width:1.2; transition:fill .55s var(--ease)}
-  .bodies .detail{fill:none; stroke:rgba(0,0,0,.35); stroke-width:1.1; stroke-linecap:round}
+  /* Die Facetten tragen ihre Farbe inline, weil sie je Flaeche unterschiedlich
+     aufgehellt wird. Hier nur der weiche Uebergang beim Farbwechsel. */
+  .bodies polygon{transition:fill .55s var(--ease), stroke .55s var(--ease)}
 
   .legend{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:4px}
   .legend span{display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11.5px}
@@ -472,7 +471,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "3.1";
+const APP_VERSION = "3.2";
 
 /* ================================================================== icons */
 const I = {
@@ -1167,74 +1166,121 @@ function goalsCard(pr){
 }
 
 /* ------------------------------------------------------------ view: heute */
-/* Zwei abstrahierte Koerper, die belasteten Regionen eingefaerbt. Bewusst
-   geometrisch gehalten — es soll auf einen Blick lesbar sein, nicht anatomisch
-   korrekt. Kopf und Unterschenkel bleiben neutral, sie tragen keine Aussage. */
-/* Athletische Statur mit V-Form, breitem Schultergürtel und stabilem Stand.
-   Alle Gliedmassen werden nur einmal gezeichnet und an der Mittelachse
-   gespiegelt — das haelt die Figur exakt symmetrisch und die Pfade kurz. */
+/* Low-Poly-Koerper: die Figur besteht aus Facetten, jede mit eigener Helligkeit.
+   Erst dieser Helligkeitsunterschied laesst die Flaechen plastisch wirken —
+   eine glatte Kontur mit Einheitsfarbe sieht flach und billig aus.
+
+   Aufgebaut ist nur die linke Haelfte, gespiegelt an x=100. Jede Facette nennt
+   ihre Muskelgruppe (oder "neutral") und einen Helligkeitsfaktor. */
+
+const LV_RGB = {
+  gruen:[94,158,118], gelb:[233,166,60], rot:[201,106,90], neutral:[118,126,138]
+};
+const facetFill = (rgb, f) => 'rgb('
+  + Math.min(255, Math.round(rgb[0]*f)) + ','
+  + Math.min(255, Math.round(rgb[1]*f)) + ','
+  + Math.min(255, Math.round(rgb[2]*f)) + ')';
+
+/* [Muskel, Helligkeit, Punkte] — linke Koerperhaelfte, Blickrichtung von vorn.
+   Die Beine enden innen bei x<100, damit nach dem Spiegeln eine Luecke in der
+   Mitte bleibt und nicht eine durchgehende Saeule entsteht. Der Arm liegt dicht
+   am Rumpf: nur wenige Einheiten Abstand, sonst klafft dort ein schwarzer Keil. */
+const POLY_FRONT = [
+  /* Kopf und Hals */
+  ["neutral", .92,[[100,18],[86,26],[85,46],[100,42]]],
+  ["neutral", .64,[[85,46],[89,62],[100,68],[100,42]]],
+  ["neutral", .58,[[91,62],[100,68],[100,88],[93,86]]],
+  /* Schulterdach */
+  ["neutral", .76,[[89,62],[70,94],[100,98],[100,88],[93,86],[91,62]]],
+  /* Deltoide */
+  ["delts",  1.10,[[70,94],[50,102],[46,124],[64,126]]],
+  ["delts",   .80,[[64,126],[46,124],[52,144],[67,140]]],
+  ["delts",   .94,[[70,94],[64,126],[67,140],[81,132],[83,102]]],
+  /* Brust */
+  ["chest",  1.10,[[83,102],[100,98],[100,130],[81,130]]],
+  ["chest",   .84,[[81,130],[100,130],[100,162],[83,158]]],
+  ["chest",   .58,[[67,140],[81,130],[83,158],[71,152]]],
+  /* Bauch und Flanke */
+  ["core",   1.00,[[83,158],[100,162],[100,188],[85,184]]],
+  ["core",    .78,[[85,184],[100,188],[100,210],[86,207]]],
+  ["core",    .54,[[71,152],[83,158],[85,184],[75,178]]],
+  ["core",    .44,[[75,178],[85,184],[86,207],[77,200]]],
+  /* Arm */
+  ["biceps", 1.04,[[50,144],[69,140],[66,178],[48,180]]],
+  ["biceps",  .74,[[48,180],[66,178],[63,206],[45,204]]],
+  ["neutral", .88,[[45,204],[63,206],[60,242],[42,238]]],
+  ["neutral", .64,[[42,238],[60,242],[57,272],[39,268]]],
+  ["neutral", .48,[[39,268],[57,272],[55,300],[41,298]]],
+  /* Becken */
+  ["neutral", .74,[[86,207],[100,210],[100,246],[85,242]]],
+  ["neutral", .60,[[77,200],[86,207],[85,242],[75,228]]],
+  ["neutral", .66,[[75,228],[85,242],[86,262],[73,252]]],
+  /* Oberschenkel */
+  ["legs",   1.10,[[85,248],[97,248],[95,300],[85,298]]],
+  ["legs",    .74,[[73,252],[85,248],[85,298],[75,296]]],
+  ["legs",    .86,[[85,298],[95,300],[93,344],[86,344]]],
+  ["legs",    .58,[[75,296],[85,298],[86,344],[78,342]]],
+  /* Unterschenkel und Fuss */
+  ["neutral", .82,[[86,344],[93,344],[92,388],[87,388]]],
+  ["neutral", .60,[[78,342],[86,344],[87,388],[80,386]]],
+  ["neutral", .66,[[87,388],[92,388],[91,428],[88,428]]],
+  ["neutral", .46,[[80,386],[87,388],[88,428],[82,426]]],
+  ["neutral", .38,[[82,426],[91,428],[92,446],[77,446]]]
+];
+
+/* dieselbe Figur von hinten */
+const POLY_BACK = [
+  ["neutral", .92,[[100,18],[86,26],[85,46],[100,42]]],
+  ["neutral", .64,[[85,46],[89,62],[100,68],[100,42]]],
+  ["back",    .88,[[89,62],[70,94],[100,98],[100,68]]],
+  ["delts",  1.10,[[70,94],[50,102],[46,124],[64,126]]],
+  ["delts",   .80,[[64,126],[46,124],[52,144],[67,140]]],
+  ["delts",   .94,[[70,94],[64,126],[67,140],[81,132],[83,102]]],
+  /* Latissimus, zur Taille zulaufend */
+  ["back",   1.10,[[83,102],[100,98],[100,138],[71,134]]],
+  ["back",    .80,[[71,134],[100,138],[100,174],[77,168]]],
+  ["back",    .54,[[77,168],[100,174],[100,202],[85,196]]],
+  ["back",    .64,[[85,196],[100,202],[100,224],[86,220]]],
+  ["triceps",1.04,[[50,144],[69,140],[66,178],[48,180]]],
+  ["triceps", .74,[[48,180],[66,178],[63,206],[45,204]]],
+  ["neutral", .88,[[45,204],[63,206],[60,242],[42,238]]],
+  ["neutral", .64,[[42,238],[60,242],[57,272],[39,268]]],
+  ["neutral", .48,[[39,268],[57,272],[55,300],[41,298]]],
+  /* Gesaess */
+  ["glutes", 1.10,[[86,220],[100,224],[100,264],[84,260]]],
+  ["glutes",  .66,[[76,210],[86,220],[84,260],[74,246]]],
+  /* Beinrueckseite */
+  ["legs",   1.00,[[84,262],[97,264],[95,310],[85,308]]],
+  ["legs",    .70,[[74,250],[84,262],[85,308],[76,304]]],
+  ["legs",    .82,[[85,308],[95,310],[93,344],[86,344]]],
+  ["legs",    .56,[[76,304],[85,308],[86,344],[78,342]]],
+  /* Waden */
+  ["legs",   1.00,[[86,344],[93,344],[92,388],[87,388]]],
+  ["legs",    .72,[[78,342],[86,344],[87,388],[80,386]]],
+  ["neutral", .60,[[87,388],[92,388],[91,428],[88,428]]],
+  ["neutral", .44,[[80,386],[87,388],[88,428],[82,426]]],
+  ["neutral", .38,[[82,426],[91,428],[92,446],[77,446]]]
+];
+
 function silhouette(st){
   const by = muscleMap(st);
-  const reg = (m, d) => '<path class="reg" fill="var(--lv-'+by[m].level+')" fill-opacity=".8" d="'+d+'"/>';
-  const neu = d => '<path class="neutral" d="'+d+'"/>';
-  const det = d => '<path class="detail" d="'+d+'"/>';
-  const mirror = inner => inner + '<g transform="translate(200,0) scale(-1,1)">' + inner + '</g>';
+  const facets = list => list.map(f => {
+    const rgb = f[0] === "neutral" ? LV_RGB.neutral : LV_RGB[by[f[0]].level];
+    const c = facetFill(rgb, f[1]);
+    /* Kontur in Fuellfarbe: schliesst die Haarlinien, die sonst durch das
+       Antialiasing zwischen angrenzenden Flaechen sichtbar werden. */
+    return '<polygon points="'+f[2].map(p => p[0]+','+p[1]).join(' ')
+         + '" fill="'+c+'" stroke="'+c+'" stroke-width=".6"/>';
+  }).join("");
 
-  /* gemeinsame neutrale Teile */
-  const head = '<ellipse class="neutral" cx="100" cy="40" rx="20" ry="25"/>'
-             + neu("M89 60 C89 72 88 78 80 83 L120 83 C112 78 111 72 111 60 Z");
-  const armNeutral =
-      neu("M29 186 C25 203 24 222 26 240 L45 243 C49 224 50 205 51 189 Z")   /* Unterarm */
-    + neu("M26 240 C23 252 25 263 31 268 C38 271 44 266 45 257 L45 243 Z");  /* Hand */
-  const shin =
-      neu("M77 330 C73 356 75 388 81 416 L96 416 C98 388 98 356 98 332 Z")
-    + neu("M81 416 C77 424 78 431 86 432 L98 432 L98 416 Z");
-
-  /* ---- Vorderansicht ---- */
-  const frontSide =
-      reg("delts", "M52 97 C39 105 32 120 32 137 C32 149 41 156 51 153 C61 150 66 137 66 123 C66 111 60 102 52 97 Z")
-    + reg("chest", "M66 111 C77 104 90 102 99 105 L99 150 C89 157 75 156 67 147 C63 137 63 120 66 111 Z")
-    + reg("biceps","M32 137 C27 153 26 170 29 186 L51 189 C54 172 56 152 54 136 Z")
-    + armNeutral
-    + reg("legs",  "M74 244 C68 269 70 301 77 330 L98 332 C100 301 100 268 98 246 Z")
-    + shin
-    + det("M85 122 C90 128 94 136 96 146");
-
-  const front =
-    '<svg viewBox="0 0 200 450" aria-hidden="true">'
-    + head
-    + neu("M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
-    + '<g transform="translate(200,0) scale(-1,1)">'
-    + neu("M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
-    + '</g>'
-    + reg("core",  "M78 150 C88 145 112 145 122 150 L120 212 C116 224 109 230 100 230 C91 230 84 224 80 212 Z")
-    + neu("M80 212 C88 222 112 222 120 212 L127 245 C116 254 84 254 73 245 Z")
-    + det("M100 156 L100 224 M82 172 L118 172 M83 190 L117 190")
-    + mirror(frontSide)
+  const figure = list =>
+    '<svg viewBox="0 0 200 456" aria-hidden="true" shape-rendering="geometricPrecision">'
+    + facets(list)
+    + '<g transform="translate(200,0) scale(-1,1)">' + facets(list) + '</g>'
     + '</svg>';
 
-  /* ---- Rueckansicht ---- */
-  const backSide =
-      reg("delts",  "M52 97 C39 105 32 120 32 137 C32 149 41 156 51 153 C61 150 66 137 66 123 C66 111 60 102 52 97 Z")
-    + reg("back",   "M66 110 C57 127 55 160 68 183 C79 199 91 204 99 202 L99 104 C88 101 74 103 66 110 Z")
-    + reg("triceps","M32 137 C27 153 26 170 29 186 L51 189 C54 172 56 152 54 136 Z")
-    + armNeutral
-    + reg("glutes", "M73 214 C65 227 65 251 75 262 C86 271 97 266 99 255 L99 218 Z")
-    + reg("legs",   "M74 262 C69 288 71 312 77 330 L98 332 C100 306 100 284 99 260 Z")
-    + shin
-    + det("M78 128 C84 148 90 168 97 182");
-
-  const back =
-    '<svg viewBox="0 0 200 450" aria-hidden="true">'
-    + head
-    + reg("back", "M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
-    + '<g transform="translate(200,0) scale(-1,1)">'
-    + reg("back", "M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
-    + '</g>'
-    + reg("back", "M79 184 C88 193 112 193 121 184 L124 216 C113 224 87 224 76 216 Z")
-    + det("M100 104 L100 214")
-    + mirror(backSide)
-    + '</svg>';
+  const front = figure(POLY_FRONT);
+  const back = figure(POLY_BACK);
 
   return '<div class="bodies">'
     + '<div class="body">' + front + '<div class="cap">Vorn</div></div>'
