@@ -29,6 +29,9 @@
     --line-2:rgba(255,255,255,.13);
     --on-bg:rgba(233,166,60,.10);
     --on-line:rgba(233,166,60,.30);
+    /* Ampelstufen — gedämpft, damit sie neben Amber nicht schreien */
+    --lv-gruen:#5E9E76; --lv-gelb:#E9A63C; --lv-rot:#C96A5A;
+    --lv-none:rgba(255,255,255,.13);
     --r-lg:24px; --r-md:18px; --r-sm:13px;
     --ease:cubic-bezier(.2,.85,.25,1);
     --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
@@ -371,6 +374,55 @@
     border-radius:8px; background:var(--on-bg); border:1px solid var(--on-line); color:var(--amber);
   }
 
+  /* ---- Ampel, Silhouette, Tagesform ---- */
+  .dotlv{width:8px; height:8px; border-radius:5px; flex-shrink:0; display:inline-block}
+  .lv-gruen{background:var(--lv-gruen)} .lv-gelb{background:var(--lv-gelb)} .lv-rot{background:var(--lv-rot)}
+
+  .bodies{display:flex; gap:6px; justify-content:center; align-items:flex-start}
+  .body{flex:1; max-width:150px; text-align:center}
+  .body svg{width:100%; height:auto; display:block}
+  .body .cap{color:var(--faint); font-size:10px; letter-spacing:.12em;
+             text-transform:uppercase; margin-top:8px; font-weight:600}
+  .body .frame{stroke:rgba(255,255,255,.16); stroke-width:1.4; fill:none}
+  .body .reg{stroke:rgba(255,255,255,.14); stroke-width:1; transition:fill .5s var(--ease)}
+
+  .legend{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:4px}
+  .legend span{display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11.5px}
+
+  .mlist{margin-top:2px}
+  .mrow{display:flex; align-items:center; gap:11px; padding:9px 0; font-size:13.5px}
+  .mrow+.mrow{border-top:1px solid var(--line)}
+  .mrow .nm2{flex:1}
+  .mrow .when{color:var(--faint); font-size:11.5px}
+  .mbar{width:54px; height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden}
+  .mbar i{display:block; height:100%; border-radius:99px}
+
+  details.more{margin-top:15px; border-top:1px solid var(--line); padding-top:13px}
+  details.more summary{
+    list-style:none; cursor:pointer; color:var(--muted); font-size:12.5px;
+    display:flex; align-items:center; justify-content:space-between; font-weight:520;
+  }
+  details.more summary::-webkit-details-marker{display:none}
+  details.more summary::after{content:"▾"; font-size:11px; opacity:.7}
+  details.more[open] summary::after{content:"▴"}
+
+  .frow{padding:13px 0; border-top:1px solid var(--line)}
+  .frow:first-child{border-top:none; padding-top:0}
+  .frow .fq{font-size:14px; margin-bottom:9px}
+  .fopts{display:flex; gap:6px}
+  .fopts button{
+    flex:1; padding:11px 4px; border-radius:12px; font-size:12.5px; font-weight:540;
+    background:var(--card-2); border:1px solid var(--line); color:var(--muted);
+  }
+  .fopts button.on{background:var(--bone); color:#0A0A0B; border-color:transparent; font-weight:640}
+
+  .recbox{display:flex; align-items:flex-start; gap:14px}
+  .recbox .glyph{margin-top:2px}
+  .pill{
+    display:inline-flex; align-items:center; gap:7px; padding:6px 11px; border-radius:99px;
+    border:1px solid var(--line); background:var(--card-2); font-size:11.5px; color:var(--muted);
+  }
+
   /* ---- motion ---- */
   @keyframes rise{from{transform:translateY(14px); opacity:0} to{transform:none; opacity:1}}
   @keyframes fade{from{opacity:0} to{opacity:1}}
@@ -398,7 +450,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "2.2";
+const APP_VERSION = "3.0";
 
 /* ================================================================== icons */
 const I = {
@@ -506,20 +558,30 @@ const DEFAULT_PLANS = {
     {id:"incline",  sets:3, min:8, max:10},
     {id:"lateral",  sets:3, min:13, max:16},
     {id:"pushdown", sets:3, min:10, max:12}]},
-  legsA:{id:"legsA", type:"Beine", title:"Beine · Woche A", ex:[
+  /* Die beiden Beintage wechseln sich ab: einmal steht die Kniebeuge schwer im
+     Mittelpunkt, einmal das Kreuzheben. Nie beides schwer am selben Tag. */
+  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge schwer", ex:[
     {id:"squat",    sets:5, min:5, max:8},
     {id:"dl_light", sets:3, min:8, max:8},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  legsB:{id:"legsB", type:"Beine", title:"Beine · Woche B", ex:[
+  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben schwer", ex:[
     {id:"deadlift", sets:3, min:4, max:6},
     {id:"squat_light",sets:4, min:8, max:8},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
-    {id:"abs",      sets:3, min:12, max:20}]}
+    {id:"abs",      sets:3, min:12, max:20}]},
+  /* Für Tage, an denen nur eine Einheit drin ist: je ein Muster pro Richtung. */
+  full:{id:"full", type:"Ganzkörper", title:"Ganzkörper", ex:[
+    {id:"squat",    sets:3, min:5, max:8},
+    {id:"bench",    sets:3, min:6, max:9},
+    {id:"pullup",   sets:4, min:3, max:5},
+    {id:"rdl",      sets:3, min:8, max:10},
+    {id:"lateral",  sets:2, min:12, max:15},
+    {id:"abs",      sets:2, min:12, max:20}]}
 };
 const DEFAULT_WEIGHTS = {
   pullup:0, row:40, row1:25, facepull:20, reardelt:25, curl:12, hammer:25,
@@ -527,9 +589,15 @@ const DEFAULT_WEIGHTS = {
   squat:50, squat_light:40, deadlift:60, dl_light:50, rdl:40, bss:0,
   legcurl:25, legext:25, calf:40, abs:0, shrug:40
 };
+/* Der Wochenrhythmus bindet nichts mehr, er ist nur noch Hintergrundwissen:
+   die Empfehlung gibt ihm einen kleinen Bonus, damit die A/B-Abwechslung von
+   Pull Kraft und Pull Volumen nicht verloren geht. Siehe rhythmPlan(). */
 const SCHEDULE = {1:"pullA", 2:"pushA", 4:"pullB", 5:"pushB", 6:"legs"};
 const DAYS = ["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
-const TYPE_COLOR = {Pull:"var(--cool)", Push:"var(--bone)", Beine:"var(--amber)"};
+const TYPE_COLOR = {
+  Pull:"var(--cool)", Push:"var(--bone)", Beine:"var(--amber)",
+  "Ganzkörper":"#9C8CC4", Boxen:"var(--red)", Pause:"var(--faint)"
+};
 
 /* Ladder goals: the end target stays, but the app aims at the next rung so
    progress stays visible instead of a bar that never moves. */
@@ -556,11 +624,8 @@ const isoYear = d => {
 const weekKey = d => isoYear(d) + "-" + String(isoWeek(d)).padStart(2, "0");
 const dayKey = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 const parseDay = s => { const p = String(s).split("-"); return new Date(+p[0], +p[1]-1, +p[2]); };
-const planForDate = d => {
-  const s = SCHEDULE[d.getDay()];
-  if (!s) return null;
-  return s === "legs" ? (isoWeek(d) % 2 === 1 ? "legsA" : "legsB") : s;
-};
+/* planForDate() ist entfallen — der Wochentag bestimmt nichts mehr.
+   Was davon uebrig ist, steckt in rhythmPlan() als Bonus fuer die Empfehlung. */
 const kg = n => {
   const v = Math.round(n * 100) / 100;
   return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/0$/,"").replace(".", ","));
@@ -573,10 +638,10 @@ const dateShort = s => parseDay(s).toLocaleDateString("de-DE", {day:"2-digit", m
 const dateLong = s => parseDay(s).toLocaleDateString("de-DE", {weekday:"long", day:"2-digit", month:"long", year:"numeric"});
 
 /* ================================================================ storage */
-const KEY = "training:v2";
-const OLD_KEY = "training:v1";
+const KEY = "training:v3";
+const OLD_KEYS = ["training:v2", "training:v1"];
 const EMPTY = () => ({
-  version:2,
+  version:3,
   weights:Object.assign({}, DEFAULT_WEIGHTS),
   cfg:{},                 /* exId -> {perSide, ecc, chain, variant} */
   plans:null,             /* null = use defaults; object = user-edited copy */
@@ -584,6 +649,7 @@ const EMPTY = () => ({
   active:null,
   makeup:[],              /* queued exercises that fell out of a session */
   rest:null,              /* {endsAt} — a timestamp, so backgrounding cannot stall it */
+  form:[],                /* Tagesform pro Tag, auch ohne Training */
   settings:{bodyweight:80, rest:120, sound:true, plates:[1.25, 2.5, 5]}
 });
 
@@ -593,14 +659,19 @@ let storageOk = true;
 function migrate(d){
   if (!d) return null;
   const out = Object.assign(EMPTY(), d);
-  out.version = 2;
+  out.version = 3;
   out.settings = Object.assign(EMPTY().settings, d.settings || {});
   out.cfg = d.cfg || {};
   out.makeup = Array.isArray(d.makeup) ? d.makeup : [];
+  out.form = Array.isArray(d.form) ? d.form : [];
   out.sessions = (Array.isArray(d.sessions) ? d.sessions : []).map(s => ({
     id: s.id || String(Math.round(Math.random()*1e9)),
     date: s.date, plan: s.plan, type: s.type, minutes: s.minutes || 0,
     note: s.note || "",
+    /* v2 kannte nur Krafteinheiten — alles Alte ist "lift" */
+    kind: s.kind || "lift",
+    effort: s.effort == null ? null : +s.effort,
+    form: s.form || null,
     entries: (s.entries || []).map(e => ({
       id:e.id, name:e.name || exName(e.id), bw:!!e.bw,
       weight:+e.weight || 0, perSide:!!e.perSide, ecc:+e.ecc || 0, chain:+e.chain || 0,
@@ -618,7 +689,8 @@ function load(){
   try {
     localStorage.setItem("training:probe", "1");
     localStorage.removeItem("training:probe");
-    const raw = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
+    let raw = localStorage.getItem(KEY);
+    for (let i = 0; !raw && i < OLD_KEYS.length; i++) raw = localStorage.getItem(OLD_KEYS[i]);
     if (raw) S = migrate(JSON.parse(raw)) || EMPTY();
   } catch(e) { storageOk = false; }
 }
@@ -741,6 +813,9 @@ function evaluate(plan, entries, weights){
   return {next:next, changes:changes};
 }
 
+/* Ohne feste Trainingstage kann die Serie keine Pflichttage mehr zaehlen.
+   Sie zaehlt jetzt aufeinanderfolgende Tage, an denen du entweder trainiert
+   oder bewusst eine Pause eingetragen hast — also dran geblieben bist. */
 function streak(){
   const done = {};
   S.sessions.forEach(s => done[s.date] = 1);
@@ -748,10 +823,250 @@ function streak(){
   let n = 0;
   if (!done[dayKey(d)]) d.setDate(d.getDate() - 1);
   for (let i = 0; i < 400; i++) {
-    if (planForDate(d)) { if (done[dayKey(d)]) n++; else break; }
+    if (!done[dayKey(d)]) break;
+    n++;
     d.setDate(d.getDate() - 1);
   }
   return n;
+}
+
+/* ====================================================== Muskeln & Erholung */
+/* Kein medizinisches Modell, sondern eine Buchhaltung: gewichtete Saetze je
+   Muskelgruppe, die ueber ein Zeitfenster linear abgebaut werden. Jede Zahl auf
+   der Startseite laesst sich damit in einem Satz erklaeren. */
+
+const MUSCLES = ["chest","back","delts","biceps","triceps","legs","glutes","core"];
+const MUSCLE_LABEL = {
+  chest:"Brust", back:"Rücken", delts:"Schultern", biceps:"Bizeps",
+  triceps:"Trizeps", legs:"Beine", glutes:"Gesäß", core:"Core"
+};
+
+/* Bewegungsmuster -> Anteil je Muskelgruppe. Greift auf EX[id].pat zu, das es
+   schon gibt: dadurch sind auch alle frueher gespeicherten Einheiten auswertbar,
+   ohne dass irgendetwas nacherfasst werden muss. */
+const PAT_MUSCLE = {
+  bench:   {chest:1.0, triceps:0.5, delts:0.4},
+  dip:     {chest:0.8, triceps:0.9, delts:0.4},
+  ohp:     {delts:1.0, triceps:0.6, core:0.2},
+  lat:     {delts:0.9},
+  tri:     {triceps:1.0},
+  vpull:   {back:1.0, biceps:0.6, core:0.3},
+  row:     {back:1.0, biceps:0.5, delts:0.3},
+  row1:    {back:1.0, biceps:0.5, delts:0.3, core:0.3},
+  rear:    {delts:0.7, back:0.4},
+  curl:    {biceps:1.0},
+  squat:   {legs:1.0, glutes:0.7, core:0.4},
+  hinge:   {glutes:1.0, back:0.7, legs:0.7, core:0.5},
+  split:   {legs:1.0, glutes:0.8, core:0.3},
+  legcurl: {legs:0.8, glutes:0.3},
+  calf:    {legs:0.4},
+  abs:     {core:1.0}
+};
+/* Boxen als Ganzkoerper- und Ausdauerbelastung. */
+const BOX_MUSCLE = {delts:0.7, core:0.8, legs:0.6, back:0.3, triceps:0.3};
+
+/* Wie lange eine Gruppe braucht, bis eine Belastung rechnerisch abgebaut ist. */
+const RECOVERY_H = {
+  chest:72, back:72, legs:72, glutes:72,
+  delts:48, biceps:48, triceps:48,
+  core:36
+};
+/* Bezugsgroesse fuer die Ampel: so viele gewichtete Saetze gelten als volle Einheit. */
+const REF_LOAD = 8;
+
+/* Einheiten kennen nur ein Datum. Fuer alte Eintraege nehmen wir die Tagesmitte
+   als neutrale Annahme; neue Einheiten speichern einen echten Zeitstempel. */
+const sessionTime = s => s.ts || (parseDay(s.date).getTime() + 12 * 3600000);
+
+/* Intensitaet: der getippte Wert schlaegt die Schaetzung. Ohne Angabe wird aus
+   dem Verhaeltnis zum besten bekannten 1RM geschaetzt. */
+function intensityFactor(e, s, best){
+  if (s && s.effort) return Math.max(0.6, Math.min(1.3, 0.55 + s.effort * 0.15));
+  const top = best && best[e.id] ? best[e.id].e1rm : 0;
+  if (!top) return 1;
+  const ratio = e1rm(e) / top;
+  return Math.max(0.6, Math.min(1.3, 0.3 + ratio * 0.8));
+}
+
+/* Gewichtete Saetze je Muskelgruppe fuer eine einzelne Einheit. */
+function sessionLoad(s, best){
+  const out = {};
+  if (!s || s.kind === "rest") return out;
+
+  if (s.kind === "boxing") {
+    const units = (s.minutes || 0) / 10 * (0.5 + (s.effort || 3) * 0.2);
+    Object.keys(BOX_MUSCLE).forEach(m => { out[m] = (out[m] || 0) + BOX_MUSCLE[m] * units; });
+    return out;
+  }
+
+  (s.entries || []).forEach(e => {
+    if (!e.reps || !e.reps.length) return;
+    const pat = (EX[e.id] || {}).pat;
+    const map = PAT_MUSCLE[pat];
+    if (!map) return;
+    const units = e.reps.length * intensityFactor(e, s, best);
+    Object.keys(map).forEach(m => { out[m] = (out[m] || 0) + map[m] * units; });
+  });
+  return out;
+}
+
+/* Aktueller Stand je Muskelgruppe: was von der Belastung rechnerisch offen ist. */
+function muscleState(now){
+  const t = now || Date.now();
+  const best = prsFrom(S.sessions);
+  const open = {}, last = {};
+  MUSCLES.forEach(m => { open[m] = 0; last[m] = null; });
+
+  S.sessions.forEach(s => {
+    const load = sessionLoad(s, best);
+    const ts = sessionTime(s);
+    const hrs = (t - ts) / 3600000;
+    if (hrs < 0) return;
+    MUSCLES.forEach(m => {
+      const l = load[m] || 0;
+      if (!l) return;
+      open[m] += l * Math.max(0, 1 - hrs / RECOVERY_H[m]);
+      if (last[m] === null || ts > last[m]) last[m] = ts;
+    });
+  });
+
+  return MUSCLES.map(m => {
+    const ratio = open[m] / REF_LOAD;
+    return {
+      id:m, label:MUSCLE_LABEL[m], open:open[m], ratio:ratio,
+      level: ratio >= 0.66 ? "rot" : ratio >= 0.33 ? "gelb" : "gruen",
+      last: last[m]
+    };
+  });
+}
+const muscleMap = st => { const o = {}; st.forEach(x => o[x.id] = x); return o; };
+
+/* Welche Muskelgruppen ein Plan ueberhaupt trifft, normiert auf Summe 1. */
+function planShare(pid){
+  const pl = planOf(pid);
+  const out = {};
+  if (!pl) return out;
+  let total = 0;
+  pl.ex.forEach(e => {
+    const map = PAT_MUSCLE[(EX[e.id] || {}).pat];
+    if (!map) return;
+    Object.keys(map).forEach(m => {
+      const v = map[m] * (e.sets || 3);
+      out[m] = (out[m] || 0) + v; total += v;
+    });
+  });
+  if (total) Object.keys(out).forEach(m => out[m] /= total);
+  return out;
+}
+
+/* Der alte Wochenplan lebt nur noch als leichter Bonus weiter. */
+function rhythmPlan(d){
+  const s = SCHEDULE[d.getDay()];
+  if (!s) return null;
+  return s === "legs" ? (isoWeek(d) % 2 === 1 ? "legsA" : "legsB") : s;
+}
+
+/* ------------------------------------------------------------- Tagesform */
+const FORM_FIELDS = [
+  {k:"energy", label:"Energie",     low:"Leer",       mid:"Geht so",   high:"Voll da"},
+  {k:"sleep",  label:"Schlaf",      low:"Schlecht",   mid:"Okay",      high:"Gut"},
+  {k:"muscle", label:"Muskeln",     low:"Sehr müde",  mid:"Etwas müde",high:"Frisch"},
+  {k:"mood",   label:"Motivation",  low:"Keine",      mid:"Mittel",    high:"Hoch"},
+  {k:"drain",  label:"Erschöpfung", low:"Stark",      mid:"Etwas",     high:"Keine"}
+];
+const formScore = f => FORM_FIELDS.reduce((a, x) => a + (+f[x.k] || 2), 0);
+const formLevel = score => score >= 12 ? "gruen" : score >= 8 ? "gelb" : "rot";
+const formForToday = () => S.form.find(f => f.date === dayKey(new Date())) || null;
+
+/* --------------------------------------------------------- Empfehlung */
+function agoPhrase(ts){
+  if (!ts) return "";
+  const days = Math.floor((Date.now() - ts) / 86400000);
+  const k = dayKey(new Date(ts)), today = dayKey(new Date());
+  if (k === today) return "heute";
+  if (days <= 1) return "gestern";
+  return "vor " + (days + 1) + " Tagen";
+}
+const joinNames = arr => arr.length > 1
+  ? arr.slice(0, -1).map(x => x.label).join(", ") + " und " + arr[arr.length-1].label
+  : (arr[0] ? arr[0].label : "");
+
+function reasonFor(pid, st){
+  const hot = st.filter(x => x.ratio >= 0.33).sort((a,b) => b.ratio - a.ratio).slice(0, 2);
+  const share = planShare(pid);
+  const fresh = st.filter(x => (share[x.id] || 0) >= 0.10)
+                  .sort((a,b) => a.ratio - b.ratio).slice(0, 2);
+  const parts = [];
+  if (hot.length) {
+    const when = agoPhrase(Math.max.apply(null, hot.map(x => x.last || 0)));
+    parts.push(joinNames(hot) + (hot.length > 1 ? " wurden " : " wurde ") + when + " stark belastet.");
+  }
+  if (fresh.length) {
+    parts.push(joinNames(fresh) + (fresh.length > 1 ? " sind " : " ist ") + "ausreichend erholt.");
+  }
+  return parts.join(" ") || "Alles erholt. Freie Wahl.";
+}
+
+/* Wie lange ein bestimmter Plan zurueckliegt. 99 = noch nie gemacht. */
+function daysSincePlan(pid){
+  let latest = null;
+  S.sessions.forEach(s => {
+    if (s.plan !== pid) return;
+    const ts = sessionTime(s);
+    if (latest === null || ts > latest) latest = ts;
+  });
+  return latest === null ? 99 : (Date.now() - latest) / 86400000;
+}
+const lastPlanLabel = pid => {
+  const d = daysSincePlan(pid);
+  if (d >= 99) return "noch nie";
+  if (d < 1) return "heute";
+  if (d < 2) return "gestern";
+  return "vor " + Math.floor(d) + " Tagen";
+};
+
+function recommend(){
+  const st = muscleState();
+  const by = muscleMap(st);
+  const form = formForToday();
+  const lvl = form ? form.level : null;
+
+  if (lvl === "rot") {
+    return {kind:"rest", level:lvl, form:form, state:st,
+      why:"Du hast heute wenig Energie, schlechten Schlaf oder starke Erschöpfung angegeben. "
+        + "Ein Ruhetag oder lockere Bewegung bringt dich weiter als eine erzwungene Einheit."};
+  }
+
+  const rhythm = rhythmPlan(new Date());
+  const lastLift = S.sessions.slice().reverse().find(s => s.kind === "lift");
+  let best = null;
+
+  Object.keys(plans()).forEach(pid => {
+    const share = planShare(pid);
+    let score = 0;
+    MUSCLES.forEach(m => {
+      const s = share[m] || 0;
+      if (!s) return;
+      score += s * (1 - Math.min(1, by[m].ratio));
+    });
+    if (lastLift && lastLift.plan === pid) score -= 0.25;
+    /* Je laenger ein Plan her ist, desto eher ist er wieder dran. Das laesst
+       die beiden Bein- und Pull-Varianten von selbst abwechseln, ohne dass ein
+       Kalender das vorgeben muss. */
+    score += Math.min(0.12, daysSincePlan(pid) * 0.02);
+    if (pid === rhythm) score += 0.08;
+    if (!best || score > best.score) best = {pid:pid, score:score};
+  });
+
+  if (!best) return {kind:"rest", level:lvl, form:form, state:st, why:"Kein Plan vorhanden."};
+
+  return {
+    kind:"plan", planId:best.pid, level:lvl, form:form, state:st,
+    why:reasonFor(best.pid, st),
+    hint: lvl === "gelb"
+      ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
+      : null
+  };
 }
 
 /* Belt maths: which plates make up a target, from what is actually owned. */
@@ -801,25 +1116,118 @@ function goalsCard(pr){
 }
 
 /* ------------------------------------------------------------ view: heute */
+/* Zwei abstrahierte Koerper, die belasteten Regionen eingefaerbt. Bewusst
+   geometrisch gehalten — es soll auf einen Blick lesbar sein, nicht anatomisch
+   korrekt. Kopf und Unterschenkel bleiben neutral, sie tragen keine Aussage. */
+function silhouette(st){
+  const by = muscleMap(st);
+  const f = m => 'fill="var(--lv-' + by[m].level + ')" fill-opacity=".55"';
+
+  const front =
+    '<svg viewBox="0 0 100 200" aria-hidden="true">'
+    + '<circle class="frame" cx="50" cy="17" r="10"/>'
+    + '<path class="frame" d="M44 27 h12"/>'
+    + '<ellipse class="reg" ' + f("delts") + ' cx="27" cy="47" rx="9.5" ry="8.5"/>'
+    + '<ellipse class="reg" ' + f("delts") + ' cx="73" cy="47" rx="9.5" ry="8.5"/>'
+    + '<rect class="reg" ' + f("chest") + ' x="35" y="38" width="30" height="25" rx="8"/>'
+    + '<rect class="reg" ' + f("biceps") + ' x="18" y="57" width="10" height="23" rx="5"/>'
+    + '<rect class="reg" ' + f("biceps") + ' x="72" y="57" width="10" height="23" rx="5"/>'
+    + '<rect class="reg" ' + f("core") + ' x="38" y="65" width="24" height="28" rx="7"/>'
+    + '<rect class="frame" x="17" y="82" width="11" height="20" rx="5"/>'
+    + '<rect class="frame" x="72" y="82" width="11" height="20" rx="5"/>'
+    + '<rect class="reg" ' + f("legs") + ' x="36" y="97" width="12" height="48" rx="6"/>'
+    + '<rect class="reg" ' + f("legs") + ' x="52" y="97" width="12" height="48" rx="6"/>'
+    + '<rect class="frame" x="38" y="148" width="9" height="34" rx="4.5"/>'
+    + '<rect class="frame" x="53" y="148" width="9" height="34" rx="4.5"/>'
+    + '</svg>';
+
+  const back =
+    '<svg viewBox="0 0 100 200" aria-hidden="true">'
+    + '<circle class="frame" cx="50" cy="17" r="10"/>'
+    + '<path class="frame" d="M44 27 h12"/>'
+    + '<ellipse class="reg" ' + f("delts") + ' cx="27" cy="47" rx="9.5" ry="8.5"/>'
+    + '<ellipse class="reg" ' + f("delts") + ' cx="73" cy="47" rx="9.5" ry="8.5"/>'
+    + '<rect class="reg" ' + f("back") + ' x="34" y="38" width="32" height="38" rx="9"/>'
+    + '<rect class="reg" ' + f("triceps") + ' x="18" y="57" width="10" height="23" rx="5"/>'
+    + '<rect class="reg" ' + f("triceps") + ' x="72" y="57" width="10" height="23" rx="5"/>'
+    + '<rect class="frame" x="17" y="82" width="11" height="20" rx="5"/>'
+    + '<rect class="frame" x="72" y="82" width="11" height="20" rx="5"/>'
+    + '<rect class="reg" ' + f("glutes") + ' x="36" y="79" width="28" height="17" rx="8"/>'
+    + '<rect class="reg" ' + f("legs") + ' x="36" y="99" width="12" height="46" rx="6"/>'
+    + '<rect class="reg" ' + f("legs") + ' x="52" y="99" width="12" height="46" rx="6"/>'
+    + '<rect class="frame" x="38" y="148" width="9" height="34" rx="4.5"/>'
+    + '<rect class="frame" x="53" y="148" width="9" height="34" rx="4.5"/>'
+    + '</svg>';
+
+  return '<div class="bodies">'
+    + '<div class="body">' + front + '<div class="cap">Vorn</div></div>'
+    + '<div class="body">' + back + '<div class="cap">Hinten</div></div>'
+    + '</div>'
+    + '<div class="legend" style="margin-top:14px">'
+    + '<span><i class="dotlv lv-gruen"></i>erholt</span>'
+    + '<span><i class="dotlv lv-gelb"></i>teilweise</span>'
+    + '<span><i class="dotlv lv-rot"></i>stark belastet</span>'
+    + '</div>'
+    + '<details class="more"><summary><span>Einzelne Muskelgruppen</span></summary>'
+    + '<div class="mlist">'
+    + st.slice().sort((a,b) => b.ratio - a.ratio).map(x =>
+        '<div class="mrow"><i class="dotlv lv-'+x.level+'"></i>'
+        + '<span class="nm2">'+x.label+'</span>'
+        + '<span class="when">'+(x.last ? agoPhrase(x.last) : "länger her")+'</span>'
+        + '<span class="mbar"><i style="width:'+Math.min(100, Math.round(x.ratio*100))+'%;background:var(--lv-'+x.level+')"></i></span>'
+        + '</div>').join("")
+    + '</div></details>';
+}
+
 function viewHeute(){
-  const now = new Date(), pid = planForDate(now), plan = pid ? planOf(pid) : null;
+  const now = new Date();
+  const rec = recommend();
   const doneToday = S.sessions.some(s => s.date === dayKey(now));
   const pr = prsFrom(S.sessions);
-  let nxt = null;
-  const d = new Date(now);
-  for (let i = 1; i <= 7 && !nxt; i++) {
-    d.setDate(d.getDate() + 1);
-    const p = planForDate(d);
-    if (p) nxt = {day:DAYS[d.getDay()], title:planOf(p).title};
-  }
+  const form = rec.form;
+  const recPlan = rec.kind === "plan" ? planOf(rec.planId) : null;
 
+  /* Die Empfehlung als Kopfzeile, das Wort selbst gross: "Heute empfohlen" in
+     einer Zeile mit dem Typ waere zweizeilig und wuerde alles nach unten druecken. */
+  const detail = recPlan ? recPlan.title.replace(/^[^·]*·\s*/, "") : "";
   let h = '<div class="hero"><div class="meta">'
-    + DAYS[now.getDay()] + '<i></i>KW ' + isoWeek(now) + '<i></i>Woche ' + (isoWeek(now)%2===1?"A":"B")
-    + '</div><div class="title">'
-    + (plan ? 'Heute ist <span class="'+(plan.type==="Beine"?"amber":plan.type==="Pull"?"cool":"")+'">'+plan.type+'</span>' : 'Heute ist Ruhetag')
-    + '</div>' + (plan ? '<div class="sub">'+esc(plan.title)+'</div>' : '') + '</div>';
+    + DAYS[now.getDay()] + '<i></i>KW ' + isoWeek(now) + '<i></i>Heute empfohlen'
+    + '</div><div class="title '
+    + (recPlan ? (recPlan.type==="Beine"?"amber":recPlan.type==="Pull"?"cool":"") : "muted") + '">'
+    + (recPlan ? esc(recPlan.type) : 'Pause')
+    + '</div>'
+    + (recPlan && detail !== recPlan.title ? '<div class="sub">'+esc(detail)+'</div>'
+       : recPlan ? '<div class="sub">'+esc(recPlan.title)+'</div>' : '')
+    + '</div>';
 
   if (!storageOk) h += '<div class="banner warn">'+I.info+'<span>Der Browser speichert gerade nichts – im privaten Modus bleibt nichts erhalten. Öffne die App normal oder sichere über Mehr › Backup.</span></div>';
+
+  /* Empfehlung mit Begruendung — der Kern der Startseite */
+  h += '<div class="card stack">'
+    + '<div class="recbox">' + (recPlan ? glyph(recPlan.ex[0].id) : '<div class="glyph">'+I.timer+'</div>')
+    + '<div style="flex:1"><div class="lead">'+esc(rec.why)+'</div>'
+    + (rec.hint ? '<div class="banner amber" style="margin:13px 0 0">'+I.info+'<span>'+esc(rec.hint)+'</span></div>' : '')
+    + '</div></div>'
+    + '<div class="hair"></div>'
+    + '<div class="row"><span class="note">Tagesform</span>'
+    + (form
+        ? '<span class="pill"><i class="dotlv lv-'+form.level+'"></i>'
+          + (form.level === "gruen" ? "Normal trainieren" : form.level === "gelb" ? "Etwas zurückstecken" : "Ruhetag")
+          + '</span>'
+        : '<button class="pill" data-a="formask"><i class="dotlv" style="background:var(--lv-none)"></i>Noch nicht erfasst</button>')
+    + '</div></div>';
+
+  /* Muskelgruppen-Ampel */
+  h += '<div class="stack"><div class="eyebrow"><span>Beanspruchte Muskelgruppen</span></div>'
+    + '<div class="card">' + silhouette(rec.state) + '</div></div>';
+
+  /* Die drei Wege in eine Einheit */
+  h += '<div class="stack">'
+    + '<button class="btn" data-a="choose">Training auswählen</button>'
+    + '<button class="btn ghost" data-a="boxask">Boxen eintragen</button>'
+    + '<button class="btn ghost" data-a="restask">Pause / Regeneration</button>'
+    + (doneToday ? '<div class="note" style="padding:12px 4px 0">Heute ist schon etwas eingetragen. Eine zweite Einheit ist trotzdem möglich.</div>' : '')
+    + '</div>';
 
   if (S.makeup.length) {
     h += '<div class="banner amber">'+I.swap+'<span>Nachzuholen: '
@@ -840,37 +1248,13 @@ function viewHeute(){
       + '</div>';
   }
 
-  if (plan && !doneToday) {
-    h += '<div class="card stack"><div class="row" style="margin-bottom:15px">'
-      + '<div style="font-size:17px;font-weight:640;letter-spacing:-.02em">'+esc(plan.title)+'</div>'
-      + '<span class="tag">'+plan.ex.length+' Übungen</span></div>'
-      + plan.ex.map(e => {
-          const c = cfgOf(e.id), w = S.weights[e.id] || 0;
-          return '<div class="exrow">'+glyph(e.id)+'<div class="body"><div class="nm">'+esc(exName(e.id))+'</div>'
-            + '<div class="sc">' + (c.variant ? esc(c.variant)+' · ' : '')
-            + (e.total ? e.total[0]+'–'+e.total[1]+' Wdh. gesamt' : e.sets+' × '+(e.min===e.max?e.min:e.min+'–'+e.max))
-            + ' · ' + (isBw(e.id) && w === 0 ? 'Körpergewicht' : kg(w)+' kg'+(c.perSide?' pro Seite':''))
-            + '</div></div></div>';
-        }).join("")
-      + '<div style="margin-top:18px"><button class="btn" data-a="start" data-id="'+plan.id+'">Training starten</button></div></div>';
-  } else if (plan && doneToday) {
-    h += '<div class="card stack" style="display:flex;gap:14px;align-items:center">'
-      + '<div class="glyph on" style="width:40px;height:40px">'+I.check+'</div>'
-      + '<div><div style="font-size:15px;font-weight:600">'+esc(plan.title)+' steht im Kasten.</div>'
-      + '<div class="note" style="margin-top:2px">Details im Verlauf.</div></div></div>';
-  } else {
-    h += '<div class="card stack"><div class="lead" style="margin-bottom:4px">Kein Training geplant.</div>'
-      + '<div class="note">' + (nxt ? 'Als Nächstes: '+nxt.day+', '+esc(nxt.title)+'.' : '') + '</div>'
-      + '<div style="margin-top:17px" id="picker"><button class="btn ghost" data-a="pick">Trotzdem trainieren</button></div></div>';
-  }
-
   const wk = weekCounts();
   const thisWeek = wk[weekKey(new Date())] || 0;
   h += '<div class="grid2 stack">'
     + '<div class="card stat"><div class="lbl">'+I.flame+' Serie</div><span class="big num">'+streak()+'</span>'
-    + '<span class="unit">Einheiten</span><div class="foot">ohne Lücke</div></div>'
+    + '<span class="unit">Tage</span><div class="foot">am Ball geblieben</div></div>'
     + '<div class="card stat"><div class="lbl">'+I.cal+' Diese Woche</div><span class="big num">'+thisWeek+'</span>'
-    + '<span class="unit">/ 5</span><div class="foot">'+S.sessions.length+' Trainings gesamt</div></div>'
+    + '<span class="unit">Einheiten</span><div class="foot">'+S.sessions.length+' insgesamt</div></div>'
     + '</div>';
 
   h += '<div class="stack"><div class="eyebrow"><span>Hauptziele</span><span class="faint">Etappen</span></div>' + goalsCard(pr) + '</div>';
@@ -917,13 +1301,26 @@ function viewVerlauf(){
     + '<div class="row" style="margin-top:5px">'
     + ['Pull','Push','Beine'].map(t => '<i style="flex:1;height:2px;margin-right:6px;border-radius:2px;background:'+TYPE_COLOR[t]+'"></i>').join("")
     + '</div></div>'
-    + '<div class="chips">' + ["Alle","Pull","Push","Beine"].map(f =>
+    + '<div class="chips">' + ["Alle","Pull","Push","Beine","Ganzkörper","Boxen"].map(f =>
         '<button class="chip'+(filter===f?" on":"")+'" data-a="filter" data-id="'+f+'">'+f+'</button>').join("") + '</div>'
     + (list.length ? list.map(s => sessionCard(s)).join("")
       : '<div class="note" style="padding:12px 4px">Noch keine Trainings gespeichert.</div>');
 }
 
 function sessionCard(s){
+  if (s.kind === "rest" || s.kind === "boxing") {
+    const isBox = s.kind === "boxing";
+    return '<div class="card tight" data-a="open" data-id="'+s.id+'" style="margin-bottom:9px">'
+      + '<div class="row"><div style="min-width:0">'
+      + '<div style="font-size:15px;font-weight:620;letter-spacing:-.018em">'
+      + (isBox ? 'Boxen' : 'Pause') + '</div>'
+      + '<div class="note" style="margin-top:4px">'+dateShort(s.date)
+      + (isBox ? ' · '+s.minutes+' min · Intensität '+(s.effort||3)+'/5' : ' · bewusster Ruhetag')+'</div></div>'
+      + '<div style="text-align:right;flex-shrink:0;margin-left:12px">'
+      + '<i class="dotlv" style="background:'+(TYPE_COLOR[s.type]||"var(--faint)")+'"></i>'
+      + '<div class="faint" style="font-size:11px;margin-top:6px">ansehen ›</div>'
+      + '</div></div></div>';
+  }
   const logged = s.entries.filter(e => e.reps.length);
   const sets = logged.reduce((a,e) => a + e.reps.length, 0);
   const ton = logged.reduce((a,e) => a + tonnage(e), 0);
@@ -943,6 +1340,31 @@ function sessionCard(s){
 function viewSessionDetail(id){
   const s = S.sessions.find(x => x.id === id);
   if (!s) { route = null; return viewVerlauf(); }
+
+  /* Boxen und Pausen haben keine Saetze — eigene, kurze Ansicht */
+  if (s.kind === "rest" || s.kind === "boxing") {
+    const isBox = s.kind === "boxing";
+    const load = sessionLoad(s, prsFrom(S.sessions));
+    const hit = MUSCLES.filter(m => (load[m] || 0) > 0.2)
+                       .sort((a,b) => (load[b]||0) - (load[a]||0));
+    return '<div class="topbar"><button class="back" data-a="closeroute">'+I.left+' Verlauf</button>'
+      + '<button class="rb xs" data-a="delsession" data-id="'+s.id+'">'+I.trash+'</button></div>'
+      + '<div style="font-size:29px;font-weight:700;letter-spacing:-.038em">'+(isBox?'Boxen':'Pause')+'</div>'
+      + '<div class="note" style="margin:9px 0 24px">'+dateLong(s.date)+'</div>'
+      + (isBox
+        ? '<div class="grid2 stack">'
+          + '<div class="card stat"><div class="lbl">'+I.clock+' Dauer</div>'
+          + '<span class="big num" style="font-size:27px">'+s.minutes+'</span><span class="unit">min</span></div>'
+          + '<div class="card stat"><div class="lbl">'+I.bolt+' Intensität</div>'
+          + '<span class="big num" style="font-size:27px">'+(s.effort||3)+'</span><span class="unit">/ 5</span></div>'
+          + '</div>'
+          + (hit.length ? '<div class="stack"><div class="eyebrow">Belastet vor allem</div><div class="card">'
+              + hit.map(m => '<div class="mrow"><span class="nm2">'+MUSCLE_LABEL[m]+'</span>'
+                + '<span class="num muted" style="font-size:12.5px">'+(Math.round(load[m]*10)/10)+' Sätze</span></div>').join("")
+              + '</div></div>' : '')
+        : '<div class="card"><div class="lead">Bewusster Ruhetag. Zählt für deine Serie und erzeugt keine Belastung.</div></div>');
+  }
+
   const idx = S.sessions.indexOf(s);
   const prev = S.sessions.slice(0, idx).reverse().find(x => x.plan === s.plan);
   const logged = s.entries.filter(e => e.reps.length);
@@ -1448,6 +1870,93 @@ function swapSheet(planId, i, mode){
     + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
 }
 
+/* ---- Tagesform: fuenf Fragen, je drei Stufen, ein Speichern ---- */
+function formSheet(next, working){
+  const cur = working || formForToday() || {};
+  openSheet(
+    '<h3>Wie geht es dir heute?</h3>'
+    + '<div class="sh-sub">Fünf kurze Fragen. Danach passt die Empfehlung dazu.</div>'
+    + FORM_FIELDS.map(f => {
+        const v = +cur[f.k] || 0;
+        return '<div class="frow"><div class="fq">'+f.label+'</div><div class="fopts">'
+          + [[1,f.low],[2,f.mid],[3,f.high]].map(o =>
+              '<button data-a="fset" data-id="'+f.k+'" data-d="'+o[0]+'" class="'+(v===o[0]?"on":"")+'">'
+              + esc(o[1])+'</button>').join("")
+          + '</div></div>';
+      }).join("")
+    + '<button class="btn" style="margin-top:18px" data-a="formok">Speichern</button>'
+    + '<button class="btn ghost" data-a="sheetclose">Abbrechen</button>',
+    {form:Object.assign({}, cur), next:next}
+  );
+}
+function saveForm(w){
+  const rec = {date:dayKey(new Date())};
+  FORM_FIELDS.forEach(f => rec[f.k] = +w[f.k] || 2);
+  rec.score = formScore(rec);
+  rec.level = formLevel(rec.score);
+  S.form = S.form.filter(f => f.date !== rec.date);
+  S.form.push(rec);
+  save();
+  return rec;
+}
+
+/* ---- Freie Trainingswahl, Empfehlung nur markiert ---- */
+function pickSheet(){
+  const rec = recommend();
+  const rid = rec.kind === "plan" ? rec.planId : null;
+  openSheet('<h3>Training auswählen</h3>'
+    + '<div class="sh-sub">'+esc(rec.why)+'</div>'
+    + Object.keys(plans()).map(k => {
+        const pl = plans()[k];
+        /* Die ersten Übungen als Vorschau: daran erkennt man einen Plan schneller
+           als am Titel, gerade bei den beiden Bein-Varianten. */
+        const preview = pl.ex.slice(0, 3).map(e => exName(e.id)).join(", ")
+                      + (pl.ex.length > 3 ? " …" : "");
+        return '<div class="exrow" data-a="start" data-id="'+k+'" style="align-items:flex-start">'
+          + glyph(pl.ex[0].id)
+          + '<div class="body"><div class="nm">'+esc(pl.title)+'</div>'
+          + '<div class="sc">'+esc(preview)+'</div>'
+          + '<div class="sc faint" style="margin-top:3px">zuletzt '+lastPlanLabel(k)+'</div></div>'
+          + (k === rid ? '<span class="tag on">Empfohlen</span>' : '')
+          + '</div>';
+      }).join("")
+    + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
+}
+
+/* ---- Boxen: nur Dauer und Intensitaet ---- */
+const BOX_DUR = [15, 30, 45, 60, 75, 90];
+function boxSheet(working){
+  const st = working || {minutes:45, effort:3};
+  openSheet('<h3>Boxen eintragen</h3>'
+    + '<div class="sh-sub">Zählt als Ganzkörper- und Ausdauerbelastung, vor allem für Schultern, Core und Beine.</div>'
+    + '<div class="frow"><div class="fq">Dauer</div><div class="chips" style="margin:0">'
+    + BOX_DUR.map(n => '<button class="chip'+(st.minutes===n?" on":"")+'" data-a="boxdur" data-d="'+n+'">'+n+' min</button>').join("")
+    + '</div></div>'
+    + '<div class="frow"><div class="fq">Wie intensiv war es?</div><div class="fopts">'
+    + [1,2,3,4,5].map(n => '<button data-a="boxint" data-d="'+n+'" class="'+(st.effort===n?"on":"")+'">'+n+'</button>').join("")
+    + '</div><div class="note" style="margin-top:9px">1 locker · 3 normal · 5 sehr hart</div></div>'
+    + '<button class="btn" style="margin-top:18px" data-a="boxok">Eintragen</button>'
+    + '<button class="btn ghost" data-a="sheetclose">Abbrechen</button>', {box:st});
+}
+
+/* ---- Bewusste Pause ---- */
+function restSheet(){
+  openSheet('<h3>Pause eintragen</h3>'
+    + '<div class="sh-sub">Hält deine Serie am Leben und macht im Verlauf sichtbar, dass du bewusst pausiert hast statt auszufallen.</div>'
+    + '<button class="btn" data-a="restok">Heute ist Ruhetag</button>'
+    + '<button class="btn ghost" data-a="sheetclose">Abbrechen</button>', {});
+}
+
+/* ---- Ein Tap nach der Einheit, praezisiert die Erholungsrechnung ---- */
+function effortSheet(id){
+  openSheet('<h3>Wie hart war das?</h3>'
+    + '<div class="sh-sub">Ein Tap. Ohne Angabe schätzt die App die Intensität aus deinen Zahlen.</div>'
+    + '<div class="fopts">'
+    + [1,2,3,4,5].map(n => '<button data-a="effset" data-id="'+id+'" data-d="'+n+'">'+n+'</button>').join("")
+    + '</div><div class="note" style="margin-top:10px">1 locker · 3 normal · 5 alles gegeben</div>'
+    + '<button class="btn ghost" style="margin-top:18px" data-a="sheetclose">Überspringen</button>', {});
+}
+
 function importSheet(data){
   const mine = S.sessions.length, theirs = (data.sessions||[]).length;
   openSheet('<h3>Backup einspielen</h3>'
@@ -1503,8 +2012,10 @@ function finishSession(){
 
   const before = prsFrom(S.sessions);
   const session = {
-    id:String(Date.now()), date:dayKey(new Date()), plan:plan.id, type:plan.type,
-    minutes:Math.max(1, Math.round((Date.now() - a.startedAt)/60000)), note:"", entries:entries
+    id:String(Date.now()), date:dayKey(new Date()), ts:Date.now(),
+    kind:"lift", plan:plan.id, type:plan.type,
+    minutes:Math.max(1, Math.round((Date.now() - a.startedAt)/60000)),
+    effort:null, form:formForToday(), note:"", entries:entries
   };
   const after = prsFrom(S.sessions.concat([session]));
   const prs = [];
@@ -1539,6 +2050,7 @@ function finishSession(){
   tab = "heute"; route = null;
   buzz(45);
   render(); toTop();
+  effortSheet(session.id);
 }
 
 function exportBackup(){
@@ -1681,14 +2193,58 @@ document.addEventListener("click", ev => {
     return;
   }
 
-  /* ---- start ---- */
-  if (a === "start") { buzz(14); startSession(id, S.makeup.slice()); return; }
-  if (a === "pick") {
-    const box = document.getElementById("picker");
-    box.innerHTML = Object.keys(plans()).map(k =>
-      '<button class="btn ghost" style="text-align:left" data-a="start" data-id="'+k+'">'+esc(plans()[k].title)+'</button>').join("");
+  /* ---- Tagesform, freie Wahl, Boxen, Pause ---- */
+  if (a === "formask") { formSheet(null); return; }
+  if (a === "choose") {
+    buzz();
+    if (!formForToday()) formSheet("pick"); else pickSheet();
     return;
   }
+  if (a === "fset") {
+    const w = Object.assign({}, sheetState.form);
+    w[id] = d; buzz();
+    formSheet(sheetState.next, w);
+    return;
+  }
+  if (a === "formok") {
+    const next = sheetState.next;
+    saveForm(sheetState.form);
+    closeSheet();
+    if (next === "pick") pickSheet(); else { render(); }
+    return;
+  }
+  if (a === "boxask") { boxSheet(); return; }
+  if (a === "boxdur") { buzz(); boxSheet(Object.assign({}, sheetState.box, {minutes:d})); return; }
+  if (a === "boxint") { buzz(); boxSheet(Object.assign({}, sheetState.box, {effort:d})); return; }
+  if (a === "boxok") {
+    const st = sheetState.box;
+    S.sessions.push({
+      id:String(Date.now()), date:dayKey(new Date()), ts:Date.now(), kind:"boxing",
+      plan:null, type:"Boxen", minutes:st.minutes, effort:st.effort,
+      form:formForToday(), note:"", entries:[]
+    });
+    save(); closeSheet(); buzz(30); summary = null; render(); toTop();
+    return;
+  }
+  if (a === "restask") { restSheet(); return; }
+  if (a === "restok") {
+    S.sessions.push({
+      id:String(Date.now()), date:dayKey(new Date()), ts:Date.now(), kind:"rest",
+      plan:null, type:"Pause", minutes:0, effort:null,
+      form:formForToday(), note:"", entries:[]
+    });
+    save(); closeSheet(); render(); toTop();
+    return;
+  }
+  if (a === "effset") {
+    const s = S.sessions.find(x => x.id === id);
+    if (s) { s.effort = d; save(); }
+    closeSheet(); buzz(); render();
+    return;
+  }
+
+  /* ---- start ---- */
+  if (a === "start") { buzz(14); closeSheet(); startSession(id, S.makeup.slice()); return; }
 
   /* ---- calendar / filter ---- */
   if (a === "mon") {
