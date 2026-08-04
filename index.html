@@ -671,7 +671,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "5.4";
+const APP_VERSION = "5.5";
 
 /* ================================================================== icons */
 const I = {
@@ -913,16 +913,39 @@ function migrate(d){
   out.cfg = d.cfg || {};
   out.makeup = Array.isArray(d.makeup) ? d.makeup : [];
   out.form = Array.isArray(d.form) ? d.form : [];
+  /* Umbenannte Uebungen. Wer im Verlauf unter altem Namen steht, faellt sonst
+     aus der Uebungstabelle: keine Zeichnung, keine Schrittweite — und vor
+     allem keine Zuordnung zu einer Muskelgruppe. Die Saetze zaehlen dann fuer
+     die Erholungsrechnung schlicht nicht mit. */
+  const UMBENANNT = {revfly: "reardelt"};
+  const neueId = id => UMBENANNT[id] || id;
+  ["weights", "cfg"].forEach(feld => {
+    Object.keys(UMBENANNT).forEach(alt => {
+      if (out[feld] && out[feld][alt] !== undefined) {
+        if (out[feld][UMBENANNT[alt]] === undefined) out[feld][UMBENANNT[alt]] = out[feld][alt];
+        delete out[feld][alt];
+      }
+    });
+  });
+
   out.sessions = (Array.isArray(d.sessions) ? d.sessions : []).map(s => ({
     id: s.id || String(Math.round(Math.random()*1e9)),
-    date: s.date, plan: s.plan, type: s.type, minutes: s.minutes || 0,
+    date: s.date, plan: s.plan, type: s.type,
+    /* Der Zeitstempel ging bisher bei jedem Laden verloren: er stand im
+       Datenmodell, wurde hier aber nicht uebernommen. Danach half nur noch
+       die Tagesmitte, und die Reihenfolge innerhalb eines Tages war weg. */
+    ts: +s.ts || 0,
+    /* Wird die Einheit nicht zeitnah abgeschlossen, laeuft die Uhr weiter.
+       Im echten Verlauf standen dadurch 2174 Minuten, also gut 36 Stunden.
+       Ueber vier Stunden ist keine Einheit — dann lieber nichts behaupten. */
+    minutes: (s.minutes > 0 && s.minutes <= 240) ? s.minutes : 0,
     note: s.note || "",
     /* v2 kannte nur Krafteinheiten — alles Alte ist "lift" */
     kind: s.kind || "lift",
     effort: s.effort == null ? null : +s.effort,
     form: s.form || null,
     entries: (s.entries || []).map(e => ({
-      id:e.id, name:e.name || exName(e.id), bw:!!e.bw,
+      id:neueId(e.id), name:e.name || exName(neueId(e.id)), bw:!!e.bw,
       weight:+e.weight || 0, perSide:!!e.perSide, ecc:+e.ecc || 0, chain:+e.chain || 0,
       variant:e.variant || "", note:e.note || "",
       skipped:e.skipped || null,
@@ -1251,7 +1274,7 @@ function reasonFor(pid, st, istAeltester){
   if (istAeltester) {
     const d = daysSincePlan(pid);
     parts.push(d >= 99
-      ? "Diesen Plan hattest du noch nie."
+      ? "Und du hast ihn noch nie trainiert."
       : "Und er liegt mit " + Math.floor(d) + " Tagen am längsten zurück.");
   }
   return parts.join(" ") || "Alles erholt. Freie Wahl.";
@@ -1773,7 +1796,7 @@ function sessionCard(s){
   return '<div class="card tight" data-a="open" data-id="'+s.id+'" style="margin-bottom:9px">'
     + '<div class="row"><div style="min-width:0">'
     + '<div style="font-size:15px;font-weight:620;letter-spacing:-.018em">'+esc((planOf(s.plan)||{}).title || s.type)+'</div>'
-    + '<div class="note" style="margin-top:4px">'+dateShort(s.date)+' · '+s.minutes+' min · '+sets+' Sätze'
+    + '<div class="note" style="margin-top:4px">'+dateShort(s.date)+(s.minutes ? ' · '+s.minutes+' min' : '')+' · '+sets+' Sätze'
     + (skipped ? ' · <span class="amber">'+skipped+' offen</span>' : '')+'</div></div>'
     + '<div style="text-align:right;flex-shrink:0;margin-left:12px">'
     + '<div class="num dim" style="font-size:15px">'+Math.round(ton/1000*10)/10+'<span class="muted" style="font-size:11px;font-family:var(--sans);letter-spacing:0"> t</span></div>'
@@ -1845,7 +1868,7 @@ function viewSessionDetail(id){
       + (isBox
         ? '<div class="grid2 stack">'
           + '<div class="card stat"><div class="lbl">'+I.clock+' Dauer</div>'
-          + '<span class="big num" style="font-size:27px">'+s.minutes+'</span><span class="unit">min</span></div>'
+          + '<span class="big num" style="font-size:27px">'+(s.minutes || '—')+'</span>'+(s.minutes ? '<span class="unit">min</span>' : '')+'</div>'
           + '<div class="card stat"><div class="lbl">'+I.bolt+' Intensität</div>'
           + '<span class="big num" style="font-size:27px">'+(s.effort||3)+'</span><span class="unit">/ 5</span></div>'
           + '</div>'
@@ -1881,7 +1904,7 @@ function viewSessionDetail(id){
     + Math.round(ton/1000*10)/10+'</span><span class="unit">t</span>'
     + '<div class="foot">'+(delta === null ? 'kein Vergleich' : (delta>=0?'+':'')+delta+' % vs. letztes Mal')+'</div></div>'
     + '<div class="card stat"><div class="lbl">'+I.clock+' Dauer</div><span class="big num" style="font-size:27px">'
-    + s.minutes+'</span><span class="unit">min</span><div class="foot">'+reps+' Wiederholungen</div></div>'
+    + (s.minutes || '—')+'</span>'+(s.minutes ? '<span class="unit">min</span>' : '')+'<div class="foot">'+reps+' Wiederholungen</div></div>'
     + '</div>';
 
   h += '<div class="stack"><div class="eyebrow"><span>Übungen</span><span class="faint">tippen für Verlauf</span></div>';
@@ -2648,7 +2671,10 @@ function finishSession(){
   const session = {
     id:String(Date.now()), date:dayKey(new Date()), ts:Date.now(),
     kind:"lift", plan:plan.id, type:plan.type,
-    minutes:Math.max(1, Math.round((Date.now() - a.startedAt)/60000)),
+    /* Gedeckelt: laeuft eine Einheit ueber Nacht offen weiter, ist die
+       gemessene Dauer wertlos. Dann lieber keine Angabe als eine falsche. */
+    minutes:(() => { const m = Math.round((Date.now() - a.startedAt)/60000);
+                     return (m >= 1 && m <= 240) ? m : 0; })(),
     effort:null, form:formForToday(), note:"", entries:entries
   };
   const after = prsFrom(S.sessions.concat([session]));
