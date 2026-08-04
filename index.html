@@ -17,8 +17,8 @@
     --bg:#08090A;
     --bone:#F2F0EC;
     --dim:#C9C6C0;
-    --muted:#7E8189;
-    --faint:#4C5057;
+    --muted:#9EA3AC;
+    --faint:#878C95;
     --amber:#E9A63C;
     --amber-dim:#8A6524;
     --cool:#7FA6C9;
@@ -167,7 +167,7 @@
      gezogen und die Beschriftung darunter mitgenommen. */
   .hstat .hs-v.word{font-weight:590; letter-spacing:-.035em}
   .hstat .hs-l{
-    font-size:9.5px; letter-spacing:.15em; text-transform:uppercase;
+    font-size:10.5px; letter-spacing:.15em; text-transform:uppercase;
     color:var(--faint); font-weight:640;
   }
 
@@ -227,7 +227,13 @@
   .bar i.done{background:var(--amber); box-shadow:0 0 12px rgba(233,166,60,.5)}
   .goal+.goal{margin-top:17px}
   .goal .row{margin-bottom:9px; font-size:13.5px}
-  .goal .mini{font-size:11px; color:var(--faint); margin-top:6px; letter-spacing:.01em}
+  /* Prognosezeile. Eigener Name statt .prog — das gibt es im Pausenbalken
+     schon, und in einer Datei ohne Scoping wirkt jede Regel global. */
+  .goal .gprog{
+    font-size:12px; margin-top:5px; color:var(--dim); font-weight:560;
+    letter-spacing:-.005em;
+  }
+  .goal .mini{font-size:12px; color:var(--faint); margin-top:6px; letter-spacing:.01em}
 
   .ring{width:52px; height:52px; flex-shrink:0; transform:rotate(-90deg)}
   .ring circle{fill:none; stroke-width:3; stroke-linecap:round}
@@ -425,7 +431,7 @@
     padding:9px 0 8px; border-radius:12px;
   }
   .w7d.heute{background:rgba(255,255,255,.06)}
-  .w7n{font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:640}
+  .w7n{font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:640}
   .w7p{
     font-size:11px; font-weight:620; letter-spacing:-.012em; text-align:center;
     line-height:1.1; white-space:nowrap;
@@ -693,7 +699,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "5.8";
+const APP_VERSION = "5.9";
 
 /* ================================================================== icons */
 const I = {
@@ -1557,6 +1563,79 @@ function stepper(action, id, value, step, suffix, opts){
     + '<button class="rb'+(o.xs?" xs":"")+'" data-a="'+action+'" data-id="'+id+'" data-d="'+step+'">'+I.plus+'</button></div>';
 }
 
+const MONATE = ["Januar","Februar","März","April","Mai","Juni",
+                "Juli","August","September","Oktober","November","Dezember"];
+
+/* Zeitreihe zu einem Ziel — aber nur, was mit dem heutigen Aufbau
+   vergleichbar ist. Wer eine Uebung umstellt (je Seite, exzentrische
+   Unterstuetzung), faengt eine neue Reihe an. Sonst liest sich eine
+   Umstellung wie ein Einbruch: im echten Verlauf steht Bankdruecken einmal
+   mit 55 kg und danach mit 20 kg je Seite plus 7 kg exzentrisch — fuer eine
+   Trendlinie waeren das 24 Prozent Rueckschritt, tatsaechlich ist es eine
+   andere Uebung. */
+function goalSeries(g){
+  const punkte = [];
+  S.sessions.forEach(s => s.entries.forEach(e => {
+    if (e.id !== g.ex || !e.reps.length) return;
+    /* Strikte Wiederholungen zaehlen nur ohne Zusatzgewicht. */
+    if (g.kind === "reps" && e.weight) return;
+    punkte.push({
+      t: sessionTime(s),
+      wert: g.kind === "reps" ? Math.max.apply(null, e.reps) : (+e.weight || 0),
+      perSide: !!e.perSide, ecc: +e.ecc || 0
+    });
+  }));
+  punkte.sort((a, b) => a.t - b.t);
+  if (!punkte.length) return [];
+  const heutigerAufbau = punkte[punkte.length - 1];
+  return punkte.filter(p => p.perSide === heutigerAufbau.perSide && p.ecc === heutigerAufbau.ecc);
+}
+
+/* Ausgleichsgerade durch die Reihe und daraus der Termin.
+   Bewusst streng: unter vier vergleichbaren Einheiten oder drei Wochen
+   Zeitraum sagt sie nichts. Eine Hochrechnung aus zwei Punkten waere
+   geraten, und geraten sieht aus wie gerechnet. */
+const PROG_MIN_PUNKTE = 4, PROG_MIN_TAGE = 21;
+function goalForecast(g, ziel){
+  const p = goalSeries(g);
+  if (p.length < PROG_MIN_PUNKTE) return {reif:false, fehlen:PROG_MIN_PUNKTE - p.length};
+  const spanne = (p[p.length-1].t - p[0].t) / 86400000;
+  if (spanne < PROG_MIN_TAGE) return {reif:false, tageFehlen:Math.ceil(PROG_MIN_TAGE - spanne)};
+
+  const x = p.map(q => (q.t - p[0].t) / 86400000);
+  const y = p.map(q => q.wert);
+  const n = x.length;
+  const mx = x.reduce((a,b) => a+b, 0) / n;
+  const my = y.reduce((a,b) => a+b, 0) / n;
+  let zaehler = 0, nenner = 0;
+  for (let i = 0; i < n; i++) { zaehler += (x[i]-mx) * (y[i]-my); nenner += (x[i]-mx) * (x[i]-mx); }
+  const proTag = nenner ? zaehler / nenner : 0;
+  if (proTag <= 0) return {reif:true, steigend:false};
+
+  const stand = my + proTag * (x[n-1] - mx);
+  const tage = (ziel - stand) / proTag;
+  if (!isFinite(tage)) return {reif:true, steigend:false};
+  if (tage <= 0) return {reif:true, steigend:true, tage:0};
+  if (tage > 3 * 365) return {reif:true, steigend:true, zuWeit:true};
+  return {reif:true, steigend:true, tage:Math.round(tage),
+          datum:new Date(p[n-1].t + tage * 86400000)};
+}
+
+/* Ein Satz zur Prognose — oder ehrlich, was noch fehlt. */
+function goalForecastText(g, ziel){
+  const f = goalForecast(g, ziel);
+  if (!f.reif) {
+    return f.fehlen !== undefined
+      ? 'Prognose ab ' + PROG_MIN_PUNKTE + ' vergleichbaren Einheiten · noch ' + f.fehlen
+      : 'Prognose ab drei Wochen Verlauf · noch ' + f.tageFehlen + ' Tage';
+  }
+  if (!f.steigend) return 'Noch kein messbarer Anstieg';
+  if (f.zuWeit) return 'Bei diesem Tempo dauert es über drei Jahre';
+  if (f.tage <= 0) return 'Etappe rechnerisch erreicht';
+  if (f.tage < 70) return 'Etwa in ' + Math.max(1, Math.round(f.tage / 7)) + ' Wochen';
+  return 'Etwa ' + MONATE[f.datum.getMonth()] + ' ' + f.datum.getFullYear();
+}
+
 function goalsCard(pr){
   return '<div class="card">' + GOALS.map(g => {
     const st = goalStep(g, pr);
@@ -1564,6 +1643,7 @@ function goalsCard(pr){
       + '<span class="num '+(st.done?"amber":"muted")+'">'+kg(st.value)+' / '+st.target+'</span></div>'
       + '<div class="bar"><i class="'+(st.done?"done":"")+'" style="width:'+Math.min(100, st.target?st.value/st.target*100:0)+'%"></i></div>'
       + '<div class="mini">'+(st.done ? 'Endziel erreicht' : 'Etappe '+st.target+' '+g.unit+' · Endziel '+st.final+' '+g.unit)+'</div>'
+      + (st.done ? '' : '<div class="gprog">'+goalForecastText(g, st.target)+'</div>')
       + '</div>';
   }).join("") + '</div>';
 }
