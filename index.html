@@ -242,6 +242,14 @@
   .exhead .var{color:var(--dim); font-size:12.5px; margin-top:4px}
   .exhead .sub{color:var(--muted); font-size:12.5px; margin-top:4px}
   .exhead .badges{display:flex; gap:5px; flex-wrap:wrap; margin-top:8px}
+  /* Mitlaufende Wiederholungszahl der Uebung */
+  .repcount{
+    min-width:34px; text-align:center; font-family:var(--mono); font-size:15px;
+    font-weight:600; letter-spacing:-.04em; color:var(--faint);
+    padding:5px 8px; border-radius:10px; border:1px solid transparent;
+    transition:color .3s, background .3s, border-color .3s;
+  }
+  .repcount.on{color:var(--amber); background:var(--on-bg); border-color:var(--on-line)}
   /* Zeile "Letztes Mal" im Training. Frueher hiess sie .ghost und kollidierte
      damit mit den Ghost-Buttons: die erbten display:flex, 11,5px Schrift und
      falsches Padding quer durch die App. */
@@ -491,7 +499,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "3.7";
+const APP_VERSION = "3.8";
 
 /* ================================================================== icons */
 const I = {
@@ -1440,6 +1448,17 @@ function viewHeute(){
     + (doneToday ? '<div class="note" style="padding:12px 4px 0">Heute ist schon etwas eingetragen. Eine zweite Einheit ist trotzdem möglich.</div>' : '')
     + '</div>';
 
+  /* Die Daten liegen nur auf diesem Geraet. Ohne Erinnerung faellt ein fehlendes
+     Backup erst auf, wenn es zu spaet ist. */
+  const bTage = backupAlter();
+  if (bTage !== null && bTage >= 30 && S.sessions.length >= 3) {
+    h += '<div class="banner warn">'+I.info+'<span>'
+      + (bTage >= 900 ? 'Du hast noch nie ein Backup gezogen.'
+                      : 'Letztes Backup vor ' + bTage + ' Tagen.')
+      + ' Deine Daten liegen nur auf diesem Gerät. '
+      + '<button class="tag" data-a="export" style="margin-left:6px">Jetzt sichern</button></span></div>';
+  }
+
   if (S.makeup.length) {
     h += '<div class="banner amber">'+I.swap+'<span>Nachzuholen: '
       + S.makeup.map(m => esc(exName(m.id))+' <span class="muted">('+dateShort(m.date)+')</span>').join(", ")
@@ -1515,7 +1534,9 @@ function viewVerlauf(){
     + '<div class="chips">' + ["Alle","Pull","Push","Beine","Ganzkörper","Boxen"].map(f =>
         '<button class="chip'+(filter===f?" on":"")+'" data-a="filter" data-id="'+f+'">'+f+'</button>').join("") + '</div>'
     + (list.length ? list.map(s => sessionCard(s)).join("")
-      : '<div class="note" style="padding:12px 4px">Noch keine Trainings gespeichert.</div>');
+      : '<div class="note" style="padding:12px 4px">Noch keine Trainings gespeichert.</div>')
+    + '<button class="btn ghost" data-a="addpast" style="margin-top:16px">Einheit nachtragen</button>'
+    + '<div class="note" style="padding:11px 4px 0">Für Trainings, die du vergessen hast einzutragen.</div>';
 }
 
 function sessionCard(s){
@@ -1548,6 +1569,52 @@ function sessionCard(s){
 }
 
 /* -------------------------------------------------- view: session details */
+/* Korrektur einer bereits gespeicherten Einheit. Bewusst dieselben Bedienelemente
+   wie im Training, damit nichts neu gelernt werden muss. */
+function editSessionView(s){
+  let h = '<div class="topbar"><button class="back" data-a="editdone">'+I.left+' Fertig</button>'
+    + '<span class="tag on">Korrekturmodus</span></div>'
+    + '<div style="font-size:25px;font-weight:700;letter-spacing:-.035em">'
+    + esc((planOf(s.plan)||{}).title || s.type)+'</div>'
+    + '<div class="note" style="margin:8px 0 20px">'+dateLong(s.date)+'</div>';
+
+  if (!s.entries.length) {
+    h += '<div class="card stack"><div class="lead">Noch keine Übung erfasst.</div>'
+      + '<div class="note" style="margin-top:6px">Füge unten die Übungen des Plans hinzu.</div></div>';
+  }
+
+  h += s.entries.map(e => {
+    const step = incOf(e.id);
+    return '<div class="card" style="margin-bottom:9px">'
+      + '<div class="exhead">' + exIcon(e.id, 42, 56)
+      + '<div class="body"><div class="nm">'+esc(exName(e.id))+'</div>'
+      + (e.variant ? '<div class="var">'+esc(e.variant)+'</div>' : '')
+      + '<div class="sub">'+(e.skipped ? 'ausgefallen · '+esc(e.skipped.reason) : e.reps.length+' Sätze')+'</div></div>'
+      + '<button class="rb xs" data-a="eexdel" data-id="'+e.id+'">'+I.trash+'</button></div>'
+      + '<div class="row" style="margin-bottom:13px"><span class="note">'
+      + (e.bw ? 'Zusatzgewicht' : e.perSide ? 'pro Seite' : 'Gewicht')+'</span>'
+      + '<div class="step">'
+      + '<button class="rb xs" data-a="ew" data-id="'+e.id+'" data-d="-'+step+'">'+I.minus+'</button>'
+      + '<button class="val num" data-a="ew-edit" data-id="'+e.id+'">'+kg(e.weight)
+      + (e.bw && !e.weight ? '' : '<small>kg</small>')+'</button>'
+      + '<button class="rb xs" data-a="ew" data-id="'+e.id+'" data-d="'+step+'">'+I.plus+'</button></div></div>'
+      + e.reps.map((r,i) =>
+          '<div class="set"><span class="idx">'+(i+1)+'</span><div class="mid">'
+          + '<button class="rb xs" data-a="er" data-id="'+e.id+'" data-i="'+i+'" data-d="-1">'+I.minus+'</button>'
+          + '<div class="reps num">'+r+'</div>'
+          + '<button class="rb xs" data-a="er" data-id="'+e.id+'" data-i="'+i+'" data-d="1">'+I.plus+'</button></div>'
+          + '<button class="rb xs" data-a="erdel" data-id="'+e.id+'" data-i="'+i+'">'+I.x+'</button></div>').join("")
+      + '<button class="addset" data-a="eradd" data-id="'+e.id+'">+ Satz</button>'
+      + '</div>';
+  }).join("");
+
+  h += '<div class="stack" style="margin-top:18px">'
+    + '<button class="btn ghost" data-a="eexadd">Übung hinzufügen</button>'
+    + '<button class="btn danger" data-a="delsession" data-id="'+s.id+'" style="margin-top:10px">Einheit löschen</button>'
+    + '</div>';
+  return h;
+}
+
 function viewSessionDetail(id){
   const s = S.sessions.find(x => x.id === id);
   if (!s) { route = null; return viewVerlauf(); }
@@ -1584,8 +1651,14 @@ function viewSessionDetail(id){
   const delta = prevTon ? Math.round((ton - prevTon) / prevTon * 100) : null;
   const reps = logged.reduce((a,e) => a + e.reps.reduce((x,r)=>x+r,0), 0);
 
+  /* Korrekturmodus: eine falsch getippte Zahl hat sonst dauerhaft Bestand und
+     verfaelscht ueber die Steigerungslogik auch alle folgenden Einheiten. */
+  if (route.edit) return editSessionView(s);
+
   let h = '<div class="topbar"><button class="back" data-a="closeroute">'+I.left+' Verlauf</button>'
-    + '<button class="rb xs" data-a="delsession" data-id="'+s.id+'">'+I.trash+'</button></div>'
+    + '<div style="display:flex;gap:6px">'
+    + '<button class="tag" data-a="editsession">Korrigieren</button>'
+    + '<button class="rb xs" data-a="delsession" data-id="'+s.id+'">'+I.trash+'</button></div></div>'
     + '<div style="font-size:29px;font-weight:700;letter-spacing:-.038em;line-height:1.05">'
     + esc((planOf(s.plan)||{}).title || s.type)+'</div>'
     + '<div class="note" style="margin:9px 0 24px">'+dateLong(s.date)+'</div>';
@@ -1855,7 +1928,8 @@ function viewSession(){
     + '<circle class="val" id="ring" cx="26" cy="26" r="'+ringR+'" stroke-dasharray="'+circ.toFixed(1)+'" '
     + 'stroke-dashoffset="'+(circ * (1 - (total?done/total:0))).toFixed(1)+'"/></svg>'
     + '<div style="flex:1"><div style="font-size:19px;font-weight:660;letter-spacing:-.025em">'+esc(plan.title)+'</div>'
-    + '<div class="note" style="margin-top:3px"><span id="cnt">'+done+' / '+total+'</span> Sätze erledigt</div></div></div>';
+    + '<div class="note" style="margin-top:3px"><span id="cnt">'+done+' / '+total+'</span> Sätze · '
+    + '<span id="elapsed">'+elapsedText()+'</span></div></div></div>';
 
   h += plan.ex.map(e => {
     const rows = a.sets[e.id] || [];
@@ -1879,11 +1953,13 @@ function viewSession(){
       + '<div class="body"><div class="nm">'+esc(exName(e.id))+'</div>'
       + (c.variant ? '<div class="var">'+esc(c.variant)+'</div>' : '')
       + '<div class="sub" data-sub="'+e.id+'">'
-      + (e.total ? 'Ziel '+e.total[0]+'–'+e.total[1]+' Wdh. gesamt · '+sum
+      + (e.total ? 'Ziel '+e.total[0]+'–'+e.total[1]+' Wdh. gesamt'
                  : e.sets+' × '+(e.min===e.max?e.min:e.min+'–'+e.max)) + '</div>'
       + (badges.length ? '<div class="badges">'+badges.join("")+'</div>' : '')
       + '</div>'
-      + '<button class="rb xs" data-a="exopts" data-id="'+e.id+'">'+I.dots+'</button></div>'
+      + '<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">'
+      + '<span class="repcount'+(sum?" on":"")+'" data-cnt="'+e.id+'">'+sum+'</span>'
+      + '<button class="rb xs" data-a="exopts" data-id="'+e.id+'">'+I.dots+'</button></div></div>'
       + '<div class="row" style="margin-bottom:13px">'
       + '<span class="note">'+(isBw(e.id) ? 'Zusatzgewicht' : c.perSide ? 'pro Seite' : 'Gewicht')+'</span>'
       + stepper("weight", e.id, a.weights[e.id], incOf(e.id), (isBw(e.id) && a.weights[e.id] === 0) ? "" : "kg")
@@ -1924,6 +2000,10 @@ function renderTabs(){
   ).join("") + '</div></div>';
 }
 
+/* Bewusst synchron: View Transitions wuerden render() asynchron machen, und
+   mehrere Stellen greifen unmittelbar danach aufs DOM zu (Meldungstexte,
+   Satzzaehler). Der optische Gewinn waere ein kurzes Ueberblenden, das Risiko
+   schwer auffindbare Folgefehler. */
 function render(){
   let html, flat = false;
   if (S.active) { html = viewSession(); flat = false; }
@@ -1994,13 +2074,19 @@ function startRest(){
   renderRest();
 }
 function tickRest(){
+  const el = document.getElementById("elapsed");
+  if (el && S.active) { const t = elapsedText(); if (el.textContent !== t) el.textContent = t; }
   if (!S.active || !S.rest) return;
   const left = restLeft();
   if (left <= 0 && !restDone) { restDone = true; buzz(70); beep(); }
   renderRest();
 }
 setInterval(tickRest, 1000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) { tickRest(); render(); } });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  if (S.active) keepAwake(true);   /* die Sperre faellt beim Wegschalten weg */
+  tickRest(); render();
+});
 
 /* iOS gibt Audio nur frei, wenn der Kontext waehrend einer echten Beruehrung
    entsteht. Frueher wurde er erst beim Ablauf des Timers erzeugt — also aus
@@ -2029,6 +2115,40 @@ function beep(){
       o.connect(g); g.connect(actx.destination);
       o.start(t); o.stop(t + 0.24);
     });
+  } catch(e){}
+}
+
+/* Tage seit dem letzten Backup; 999 heisst: noch nie eines gezogen. */
+function backupAlter(){
+  const l = S.settings.lastBackup;
+  if (!l) return 999;
+  return Math.floor((Date.now() - parseDay(l).getTime()) / 86400000);
+}
+
+/* Laufzeit der Einheit, im Kopf mitgefuehrt. */
+function elapsedText(){
+  if (!S.active) return "";
+  const min = Math.max(0, Math.round((Date.now() - S.active.startedAt) / 60000));
+  return min < 60 ? min + " min" : Math.floor(min/60) + " h " + String(min%60).padStart(2,"0");
+}
+
+/* ------------------------------------------------- Bildschirm wach halten */
+/* Waehrend einer laufenden Einheit soll das Display nicht abschalten. Die Sperre
+   geht beim Wegschalten der App verloren und wird bei Rueckkehr neu angefordert.
+   In installierten Web-Apps unter iOS funktioniert das seit 18.4. */
+let wakeLock = null;
+function keepAwake(on){
+  try {
+    if (!("wakeLock" in navigator)) return;
+    if (on && !wakeLock) {
+      navigator.wakeLock.request("screen").then(l => {
+        wakeLock = l;
+        l.addEventListener("release", () => { wakeLock = null; });
+      }).catch(() => {});
+    } else if (!on && wakeLock) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
   } catch(e){}
 }
 
@@ -2249,6 +2369,7 @@ function startSession(id, extra){
   S.active = {plan:id, extra:(extra||[]).map(m => m.id), startedAt:Date.now(),
               sets:sets, weights:weights, cfg:cf, skipped:{}};
   S.rest = null;
+  keepAwake(true);
   save(); render(); toTop();
 }
 
@@ -2308,6 +2429,7 @@ function finishSession(){
   S.weights = Object.assign({}, S.weights, ev.next);
   S.active = null;
   S.rest = null;
+  keepAwake(false);
   save();
   summary = {changes:ev.changes, prs:prs, duel:duel, planTitle:plan.title};
   tab = "heute"; route = null;
@@ -2323,6 +2445,8 @@ function exportBackup(){
   a.download = "training-" + dayKey(new Date()) + ".json";
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  S.settings.lastBackup = dayKey(new Date());
+  save();
   msg("Backup gesichert.");
 }
 function importBackup(){
@@ -2449,6 +2573,95 @@ document.addEventListener("click", ev => {
     if (confirm("Plan auf die Voreinstellung zurücksetzen?")) { S.plans = null; save(); render(); }
     return;
   }
+  /* ---- Einheit nachtragen ---- */
+  if (a === "addpast") {
+    const heute = dayKey(new Date());
+    openSheet('<h3>Einheit nachtragen</h3>'
+      + '<div class="sh-sub">Datum wählen, dann den Plan. Die Sätze trägst du danach ein.</div>'
+      + '<input class="field text" id="pd" type="date" max="'+heute+'" value="'+heute+'">'
+      + '<div style="margin-top:16px">'
+      + Object.keys(plans()).map(k => '<button class="pick" data-a="addpastDo" data-x="'+k+'">'
+          + exIcon(plans()[k].ex[0].id, 40, 52)
+          + '<div class="pbody"><div class="ptitle">'+esc(plans()[k].title)+'</div>'
+          + '<div class="pmeta">'+plans()[k].ex.length+' Übungen</div></div></button>').join("")
+      + '</div>'
+      + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
+    return;
+  }
+  if (a === "addpastDo") {
+    const datum = (document.getElementById("pd") || {}).value || dayKey(new Date());
+    const pl = planOf(el.dataset.x);
+    const sess = {
+      id:String(Date.now()), date:datum, ts:parseDay(datum).getTime() + 12*3600000,
+      kind:"lift", plan:pl.id, type:pl.type, minutes:60, effort:null, form:null, note:"",
+      entries: pl.ex.map(e => {
+        const c = cfgOf(e.id);
+        return {id:e.id, name:exName(e.id), bw:isBw(e.id), weight:S.weights[e.id] || 0,
+          perSide:!!c.perSide, ecc:+c.ecc||0, chain:+c.chain||0, variant:c.variant||"",
+          note:"", skipped:null,
+          reps: Array.from({length:e.sets || 3}, () => e.max || 8)};
+      })
+    };
+    S.sessions.push(sess);
+    S.sessions.sort((x,y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
+    save(); closeSheet();
+    /* direkt in den Korrekturmodus, dort werden die echten Zahlen eingetragen */
+    route = {view:"session", id:sess.id, edit:true};
+    render(); toTop();
+    return;
+  }
+
+  /* ---- Einheit korrigieren ---- */
+  if (a === "editsession") { route.edit = true; render(); toTop(); return; }
+  if (a === "editdone")    { route.edit = false; render(); toTop(); return; }
+  if (a === "ew" || a === "er" || a === "erdel" || a === "eradd" || a === "eexdel" || a === "ew-edit") {
+    const s = S.sessions.find(x => x.id === route.id);
+    if (!s) return;
+    const e = s.entries.find(x => x.id === id);
+    if (!e) return;
+    if (a === "ew")    { e.weight = Math.max(0, snapTo(e.weight + d, incOf(id))); }
+    if (a === "er")    { e.reps[i] = Math.max(0, (e.reps[i]||0) + d); }
+    if (a === "erdel") { e.reps.splice(i, 1); }
+    if (a === "eradd") { e.reps.push(e.reps.length ? e.reps[e.reps.length-1] : 8); }
+    if (a === "eexdel"){
+      if (!confirm(exName(id) + " aus dieser Einheit entfernen?")) return;
+      s.entries = s.entries.filter(x => x.id !== id);
+    }
+    if (a === "ew-edit") {
+      numSheet({title:exName(id), sub:e.bw ? "Zusatzgewicht" : "Gewicht in Kilogramm",
+        value:e.weight, plates:!!e.bw, quick:e.bw ? [-2.5,-1.25,1.25,2.5] : [-5,-1,1,5],
+        apply:v => { e.weight = v; save(); render(); }});
+      return;
+    }
+    /* Ohne Saetze traegt die Uebung nichts mehr bei — dann raus aus der Einheit. */
+    if (a !== "eexdel" && !e.reps.length && !e.skipped) s.entries = s.entries.filter(x => x.id !== e.id);
+    buzz(); save(); render();
+    return;
+  }
+  if (a === "eexadd") {
+    const s = S.sessions.find(x => x.id === route.id);
+    const pl = planOf(s.plan);
+    const drin = s.entries.map(x => x.id);
+    const kandidaten = (pl ? pl.ex.map(x => x.id) : []).filter(x => drin.indexOf(x) < 0);
+    const liste = kandidaten.length ? kandidaten : Object.keys(EX).filter(x => drin.indexOf(x) < 0);
+    openSheet('<h3>Übung hinzufügen</h3><div class="sh-sub">'
+      + (kandidaten.length ? 'Fehlt aus '+esc(pl.title) : 'Alle Übungen') + '</div>'
+      + liste.map(k => '<button class="pick" data-a="eexaddDo" data-x="'+k+'">'
+          + exIcon(k, 40, 52) + '<div class="pbody"><div class="ptitle">'+esc(exName(k))+'</div>'
+          + '<div class="pmeta">Schritt '+kg(incOf(k))+' kg</div></div></button>').join("")
+      + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
+    return;
+  }
+  if (a === "eexaddDo") {
+    const s = S.sessions.find(x => x.id === route.id);
+    const x = el.dataset.x, c = cfgOf(x);
+    s.entries.push({id:x, name:exName(x), bw:isBw(x), weight:S.weights[x] || 0,
+      perSide:!!c.perSide, ecc:+c.ecc||0, chain:+c.chain||0, variant:c.variant||"",
+      note:"", skipped:null, reps:[8,8,8]});
+    save(); closeSheet(); render();
+    return;
+  }
+
   if (a === "delsession") {
     if (confirm("Diese Einheit löschen?")) {
       S.sessions = S.sessions.filter(s => s.id !== id);
@@ -2682,17 +2895,23 @@ document.addEventListener("click", ev => {
   if (a === "finish") { finishSession(); return; }
   if (a === "cancel") {
     if (confirm("Training verwerfen? Die Sätze gehen verloren.")) {
-      S.active = null; S.rest = null; save(); route = null; render(); toTop();
+      S.active = null; S.rest = null; keepAwake(false); save(); route = null; render(); toTop();
     }
     return;
   }
 });
 
+/* Laufende Summe der abgehakten Wiederholungen. Genau das will man beim
+   Klimmzugsatz sehen, ohne im Kopf mitzurechnen. */
 function updateSub(cfg){
-  if (!cfg || !cfg.total) return;
+  if (!cfg || !S.active || !S.active.sets[cfg.id]) return;
   const sum = S.active.sets[cfg.id].filter(s => s.done).reduce((a,s) => a + s.reps, 0);
-  const el = document.querySelector('[data-sub="'+cfg.id+'"]');
-  if (el) el.textContent = 'Ziel ' + cfg.total[0] + '–' + cfg.total[1] + ' Wdh. gesamt · ' + sum;
+  const c = document.querySelector('[data-cnt="'+cfg.id+'"]');
+  if (c) { c.textContent = sum; c.classList.toggle("on", sum > 0); }
+  if (cfg.total) {
+    const el = document.querySelector('[data-sub="'+cfg.id+'"]');
+    if (el) el.textContent = 'Ziel ' + cfg.total[0] + '–' + cfg.total[1] + ' Wdh. gesamt';
+  }
 }
 /* Sets belonging to a skipped exercise must leave the denominator, otherwise the
    ring can never close and the count reads unfinished for the rest of the session. */
