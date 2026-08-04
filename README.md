@@ -81,6 +81,11 @@ Die Körpergrafik der Muskelgruppen-Anzeige stammt aus
 lizenziert unter der Apache License 2.0. Übernommen wurden ausschließlich die
 SVG-Pfaddaten der Muskelregionen; gerendert und eingefärbt wird mit eigenem Code.
 
+Die Übungszeichnungen stammen aus [Everkinetic](https://github.com/everkinetic/data),
+lizenziert unter CC BY-SA 4.0. Je Übung sind zwei Vektorbilder eingebettet —
+entspannte und angespannte Position. Die Füllebene wurde entfernt, damit die
+Linien der Textfarbe folgen; die Pfade selbst sind unverändert.
+
 ## Aufbau
 
 | Datei | Zweck |
