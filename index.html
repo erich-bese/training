@@ -322,19 +322,48 @@
   .tab span{font-size:10px; font-weight:540; letter-spacing:.01em}
   .tab.on span{font-weight:640}
 
+  /* Der Pausenbalken schwebt ueber dem Inhalt, statt auf derselben Ebene zu
+     liegen: Verlauf nach oben trennt ihn vom Scrollinhalt, ein kraeftiger
+     Schatten hebt ihn ab. Sonst geht er zwischen den Satzreihen unter. */
   .restbar{
     position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex; justify-content:center;
-    padding:0 20px calc(20px + env(safe-area-inset-bottom));
+    padding:30px 20px calc(20px + env(safe-area-inset-bottom));
+    pointer-events:none;
+    background:linear-gradient(to top, var(--bg) 46%, rgba(8,9,10,.75) 76%, rgba(8,9,10,0));
   }
   .restbar .inner{
-    max-width:430px; width:100%; background:rgba(24,25,28,.9);
-    backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
-    border:1px solid var(--line); border-radius:var(--r-md); padding:13px 17px;
+    pointer-events:auto;
+    max-width:430px; width:100%; background:rgba(34,36,41,.97);
+    backdrop-filter:blur(26px) saturate(150%); -webkit-backdrop-filter:blur(26px) saturate(150%);
+    border:1px solid var(--line-2); border-radius:var(--r-md); padding:15px 18px;
     display:flex; align-items:center; justify-content:space-between; gap:12px;
+    box-shadow:0 12px 34px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.05) inset;
     animation:rise .3s var(--ease);
   }
   .restbar .t{font-size:23px; font-weight:640; color:var(--amber); letter-spacing:-.05em}
-  .restbar.over .t{color:var(--bone)}
+  /* Ohne eigene Regel rendert das Uhrsymbol als schwarze Flaeche in Originalgroesse. */
+  .restbar svg{width:15px; height:15px; flex-shrink:0; stroke:currentColor;
+               stroke-width:1.9; fill:none; stroke-linecap:round; stroke-linejoin:round}
+  .restbar #restlbl{white-space:nowrap}
+
+  /* Abgelaufen muss sich klar von laufend unterscheiden, sonst wird der Zustand
+     uebersehen: warmer Grund, pulsierender Rand, gefuellter Knopf. */
+  .restbar.over .inner{
+    border-color:var(--on-line); background:rgba(233,166,60,.16);
+    animation:restPulse 1.7s ease-in-out infinite;
+  }
+  .restbar.over .t{color:var(--amber); font-size:19px}
+  .restbar.over #restlbl{color:var(--amber) !important; font-weight:650}
+  .restbar.over #restbtn{
+    background:var(--amber); color:#0A0A0B; border-color:transparent;
+    font-weight:700; padding:8px 18px; font-size:12px;
+  }
+  .restbar.over .prog{display:none}
+  @keyframes restPulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(233,166,60,.34)}
+    55%{box-shadow:0 0 0 9px rgba(233,166,60,0)}
+  }
+  @media (prefers-reduced-motion:reduce){.restbar.over .inner{animation:none}}
   .restbar .prog{position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:0 0 var(--r-md) var(--r-md); overflow:hidden}
 
   .topbar{display:flex; align-items:center; justify-content:space-between; padding:26px 0 20px; gap:12px}
@@ -499,7 +528,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "3.8";
+const APP_VERSION = "4.0";
 
 /* ================================================================== icons */
 const I = {
