@@ -829,7 +829,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.0";
+const APP_VERSION = "8.1";
 
 /* ================================================================== icons */
 const I = {
@@ -3118,7 +3118,11 @@ function closeSheet(){ sheetState = null; sheetEl.innerHTML = ""; }
 /* Ist bereits ein Sheet offen, wird nur der Inhalt getauscht. Baut man den
    Rahmen jedes Mal neu, startet die Einblend-Animation bei jedem Tippen von
    vorn — das ist das Flackern in der Tagesform- und Auswahlansicht. */
-function openSheet(html, state){
+/* `fokus` nur dort, wo wirklich getippt werden soll. Vorher bekam jedes
+   Eingabefeld in jedem Sheet sofort den Cursor — auf dem iPhone faehrt dann
+   die Tastatur hoch und die Ansicht springt, obwohl man nur eine Einstellung
+   antippen wollte. */
+function openSheet(html, state, fokus){
   sheetState = state || {};
   const inner = sheetEl.querySelector(".sheet .inner");
   if (inner) {
@@ -3128,6 +3132,7 @@ function openSheet(html, state){
   } else {
     sheetEl.innerHTML = '<div class="scrim" data-a="sheetclose"></div><div class="sheet"><div class="inner">'+html+'</div></div>';
   }
+  if (!fokus) return;
   const f = sheetEl.querySelector(".field");
   if (f) { f.focus(); try { f.select(); } catch(e){} }
 }
@@ -3143,7 +3148,7 @@ function numSheet(o){
             : '<span class="note">nichts</span>')
         + (hint.rest ? '<span class="note">+ '+kg(hint.rest)+' kg fehlen</span>' : '') + '</div>' : '')
     + '<button class="btn" style="margin-top:16px" data-a="nfok">Übernehmen</button>'
-    + '<button class="btn ghost" data-a="sheetclose">Abbrechen</button>', o);
+    + '<button class="btn ghost" data-a="sheetclose">Abbrechen</button>', o, true);
 }
 
 /* Die Zeichnung in Ruhe ansehen. Auf 40 Pixel in einer Liste ist von der
