@@ -414,6 +414,28 @@
       var(--bg) 34%, rgba(8,9,10,.74) 70%, rgba(8,9,10,0));
   }
 
+  /* ---- Wochenvorschau ---- */
+  /* Sieben Spalten sind eng. Deshalb keine Kaestchen: nur Tag, Punkt, Name.
+     Der Rahmen um jede Zelle hat die Zeile frueher zusammengedrueckt, ohne
+     etwas zu ordnen — das machen Abstand und Ausrichtung schon. Nur der
+     heutige Tag bekommt eine Flaeche, damit man den Einstieg findet. */
+  .week7{display:flex; margin:0 -6px}
+  .w7d{
+    flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:10px;
+    padding:9px 0 8px; border-radius:12px;
+  }
+  .w7d.heute{background:rgba(255,255,255,.06)}
+  .w7n{font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:640}
+  .w7p{
+    font-size:11px; font-weight:620; letter-spacing:-.012em; text-align:center;
+    line-height:1.1; white-space:nowrap;
+  }
+  .w7d i{width:7px; height:7px; border-radius:4px; display:block; background:var(--lv-none)}
+  .w7d.pull i{background:var(--cool)} .w7d.pull .w7p{color:var(--cool)}
+  .w7d.push i{background:var(--bone)} .w7d.push .w7p{color:var(--dim)}
+  .w7d.beine i{background:var(--amber)} .w7d.beine .w7p{color:var(--amber)}
+  .w7d.frei .w7p{color:var(--faint)}
+
   /* ---- bottom bars ---- */
   .tabbar{
     position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; justify-content:center;
@@ -671,7 +693,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "5.5";
+const APP_VERSION = "5.8";
 
 /* ================================================================== icons */
 const I = {
@@ -844,6 +866,7 @@ const DEFAULT_WEIGHTS = {
    erholt war, und damit wieder der Kalender bestimmt. Die Abwechslung regelt
    jetzt allein der Rueckstand in recommend(). */
 const DAYS = ["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
+const DAYS_SHORT = ["So","Mo","Di","Mi","Do","Fr","Sa"];
 const TYPE_COLOR = {
   Pull:"var(--cool)", Push:"var(--bone)", Beine:"var(--amber)",
   "Ganzkörper":"#9C8CC4", Boxen:"var(--red)", Pause:"var(--faint)"
@@ -1183,13 +1206,16 @@ function sessionLoad(s, best){
 }
 
 /* Aktueller Stand je Muskelgruppe: was von der Belastung rechnerisch offen ist. */
-function muscleState(now){
+/* `extra` sind angenommene, noch nicht stattgefundene Einheiten. Sie zaehlen
+   fuer die Belastung mit, aber nie fuer die Rekorde — sonst wuerde eine
+   geplante Einheit die Intensitaetsschaetzung der echten verschieben. */
+function muscleState(now, extra){
   const t = now || Date.now();
   const best = prsFrom(S.sessions);
   const open = {}, last = {};
   MUSCLES.forEach(m => { open[m] = 0; last[m] = null; });
 
-  S.sessions.forEach(s => {
+  (extra && extra.length ? S.sessions.concat(extra) : S.sessions).forEach(s => {
     const load = sessionLoad(s, best);
     const ts = sessionTime(s);
     const hrs = (t - ts) / 3600000;
@@ -1314,6 +1340,97 @@ const lastPlanLabel = pid => {
   if (d < 2) return "gestern";
   return "vor " + Math.floor(d) + " Tagen";
 };
+
+/* Eine geplante Einheit als Rechenmodell — nur so viel, wie sessionLoad
+   braucht. Anstrengung 3 heisst normale Intensitaet, also Faktor 1: eine
+   Annahme darf nicht schwerer wiegen als eine echte Einheit. */
+function plannedSession(pid, ts){
+  const pl = planOf(pid);
+  if (!pl) return null;
+  return {
+    id:"geplant:"+pid+":"+ts, date:dayKey(new Date(ts)), ts:ts, kind:"lift",
+    plan:pid, type:pl.type, minutes:0, effort:3, form:null, note:"",
+    entries: pl.ex.map(e => ({
+      id:e.id, name:exName(e.id), bw:isBw(e.id),
+      weight:+S.weights[e.id] || 0, perSide:false, ecc:0, chain:0,
+      variant:"", note:"", skipped:null,
+      reps: new Array(Math.max(1, e.sets || 3)).fill(e.min || 8)
+    }))
+  };
+}
+
+/* Sieben Tage vorausgerechnet.
+   Der Kniff: jeder angenommene Trainingstag fliesst in die Rechnung des
+   naechsten ein. Ohne das stuende an jedem Tag derselbe Vorschlag, weil sich
+   die Erholung ohne Belastung nur weiter verbessert. Die Vorschau gilt also
+   unter der Annahme, dass man ihr folgt — und genau das steht auch dran. */
+function weekAhead(){
+  const geplant = [];
+  const tage = [];
+  const start = new Date();
+  start.setHours(18, 0, 0, 0);            /* Trainingszeit als Bezugspunkt */
+
+  /* Wie oft wird tatsaechlich trainiert? Ohne diese Bremse schlaegt das
+     Erholungsmodell sieben Tage am Stueck vor — bei einem Split ist die
+     Gegenseite naemlich immer frisch. Gerechnet wird deshalb mit dem eigenen
+     Rhythmus der letzten drei Wochen, nicht mit dem, was gerade ginge. */
+  const jetzt = Date.now();
+  const fenster = S.sessions.filter(s => s.kind === "lift"
+    && jetzt - sessionTime(s) <= 21 * 86400000);
+  /* Durch den tatsaechlichen Zeitraum teilen, nicht durch die vollen drei
+     Wochen: wer erst seit acht Tagen erfasst, traininert sonst rechnerisch
+     nur halb so oft, wie er es tut. Nach unten auf eine Woche begrenzt, damit
+     wenige Tage keinen unrealistisch hohen Schnitt ergeben. */
+  const aeltest = fenster.length ? Math.min.apply(null, fenster.map(sessionTime)) : jetzt;
+  const spanne = Math.max(7, Math.min(21, (jetzt - aeltest) / 86400000 + 1));
+  const proWoche = fenster.length
+    ? Math.max(2, Math.min(6, Math.round(fenster.length / spanne * 7)))
+    : 3;
+
+  /* Hat er heute schon trainiert, faengt der Plan morgen an. */
+  const heuteSchon = S.sessions.some(s => s.kind === "lift" && s.date === dayKey(new Date()));
+  const ersterTag = heuteSchon ? 1 : 0;
+  const platz = 7 - ersterTag;
+  const anzahl = Math.max(1, Math.min(proWoche, platz));
+  const trainingstage = {};
+  for (let n = 0; n < anzahl; n++) trainingstage[ersterTag + Math.round(n * platz / anzahl)] = true;
+
+  for (let i = 0; i < 7; i++) {
+    const t = start.getTime() + i * 86400000;
+    if (!trainingstage[i]) { tage.push({ts:t, pid:null, type:null, erledigt:i === 0 && heuteSchon}); continue; }
+    const by = muscleMap(muscleState(t, geplant));
+
+    let best = null;
+    Object.keys(plans()).forEach(pid => {
+      if (planOf(pid).noSuggest) return;
+      const share = planShare(pid);
+      let frische = 0;
+      MUSCLES.forEach(m => {
+        const anteil = share[m] || 0;
+        if (anteil) frische += anteil * (1 - Math.min(1, by[m].ratio));
+      });
+      /* Rueckstand zaehlt gegenueber der echten und der geplanten Historie. */
+      let letzte = null;
+      S.sessions.concat(geplant).forEach(s => {
+        if (s.plan !== pid) return;
+        const st = sessionTime(s);
+        if (st <= t && (letzte === null || st > letzte)) letzte = st;
+      });
+      const rueckstand = letzte === null ? 1 : Math.min(1, (t - letzte) / 86400000 / 10);
+      const score = 0.7 * frische + 0.3 * rueckstand;
+      if (!best || score > best.score) best = {pid:pid, score:score, frische:frische};
+    });
+
+    /* Ist nichts ausreichend erholt, ist der ehrliche Vorschlag: nichts. */
+    if (best && best.frische >= 0.55) {
+      tage.push({ts:t, pid:best.pid, type:planOf(best.pid).type});
+      geplant.push(plannedSession(best.pid, t));
+    } else {
+      tage.push({ts:t, pid:null, type:null});
+    }
+  }
+  return tage;
+}
 
 function recommend(){
   const st = muscleState();
@@ -1650,6 +1767,24 @@ function viewHeute(){
   /* Muskelgruppen-Ampel */
   h += '<div class="stack"><div class="eyebrow"><span>Beanspruchte Muskelgruppen</span></div>'
     + '<div class="card">' + silhouette(rec.state) + '</div></div>';
+
+  /* Wochenvorschau — nur wenn ueberhaupt etwas vorgeschlagen wird */
+  const vorschau = weekAhead();
+  if (vorschau.some(t => t.pid)) {
+    h += '<div class="stack"><div class="eyebrow"><span>Nächste sieben Tage</span>'
+      + '<span class="faint">Vorschau</span></div><div class="card"><div class="week7">'
+      + vorschau.map((t, i) => {
+          const klasse = t.type === "Pull" ? "pull" : t.type === "Push" ? "push"
+                       : t.type === "Beine" ? "beine" : "frei";
+          return '<div class="w7d '+klasse+(i === 0 ? " heute" : "")+'">'
+            + '<span class="w7n">'+(i === 0 ? "Heute" : DAYS_SHORT[new Date(t.ts).getDay()])+'</span>'
+            + '<i></i><span class="w7p">'+(t.type || (t.erledigt ? "Fertig" : "Frei"))+'</span></div>';
+        }).join("")
+      + '</div><div class="note" style="margin-top:13px">'
+      + 'Gerechnet unter der Annahme, dass du dem Vorschlag folgst — jede Einheit '
+      + 'verschiebt die folgenden. Tagesform und Lust schlagen die Rechnung.'
+      + '</div></div></div>';
+  }
 
   /* Die drei Wege in eine Einheit */
   h += '<div class="stack">'
