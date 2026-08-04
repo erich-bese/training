@@ -378,13 +378,17 @@
   .dotlv{width:8px; height:8px; border-radius:5px; flex-shrink:0; display:inline-block}
   .lv-gruen{background:var(--lv-gruen)} .lv-gelb{background:var(--lv-gelb)} .lv-rot{background:var(--lv-rot)}
 
-  .bodies{display:flex; gap:6px; justify-content:center; align-items:flex-start}
-  .body{flex:1; max-width:150px; text-align:center}
-  .body svg{width:100%; height:auto; display:block}
-  .body .cap{color:var(--faint); font-size:10px; letter-spacing:.12em;
-             text-transform:uppercase; margin-top:8px; font-weight:600}
-  .body .frame{stroke:rgba(255,255,255,.16); stroke-width:1.4; fill:none}
-  .body .reg{stroke:rgba(255,255,255,.14); stroke-width:1; transition:fill .5s var(--ease)}
+  /* Streng auf .bodies scopen: .body ist seit jeher die Textspalte der
+     Übungszeilen — unscoped würde die Silhouette deren Layout kapern. */
+  .bodies{display:flex; gap:10px; justify-content:center; align-items:flex-start}
+  .bodies .body{flex:1; max-width:158px; text-align:center}
+  .bodies .body svg{width:100%; height:auto; display:block; overflow:visible}
+  .bodies .cap{color:var(--faint); font-size:10px; letter-spacing:.12em;
+               text-transform:uppercase; margin-top:10px; font-weight:600}
+  /* neutrale Partien: Kopf, Unterarme, Schienbeine — sie tragen keine Aussage */
+  .bodies .neutral{fill:rgba(255,255,255,.055); stroke:rgba(255,255,255,.15); stroke-width:1.2}
+  .bodies .reg{stroke:rgba(255,255,255,.2); stroke-width:1.2; transition:fill .55s var(--ease)}
+  .bodies .detail{fill:none; stroke:rgba(0,0,0,.35); stroke-width:1.1; stroke-linecap:round}
 
   .legend{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:4px}
   .legend span{display:flex; align-items:center; gap:6px; color:var(--muted); font-size:11.5px}
@@ -415,6 +419,24 @@
     background:var(--card-2); border:1px solid var(--line); color:var(--muted);
   }
   .fopts button.on{background:var(--bone); color:#0A0A0B; border-color:transparent; font-weight:640}
+
+  /* Trainingsauswahl: eine Zeile pro Plan, immer gleich hoch, nie umbrechend. */
+  .pick{
+    display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+    padding:12px 13px; border-radius:15px; border:1px solid var(--line);
+    background:rgba(255,255,255,.03); transition:transform .12s var(--ease), border-color .2s;
+  }
+  .pick+.pick{margin-top:7px}
+  .pick:active{transform:scale(.99)}
+  .pick.on{border-color:var(--on-line); background:var(--on-bg)}
+  .pick .pbody{flex:1; min-width:0}
+  .pick .ptitle{font-size:14.5px; font-weight:620; letter-spacing:-.012em}
+  .pick .pmeta{
+    color:var(--muted); font-size:12px; margin-top:4px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pick .plast{color:var(--faint)}
+  .pick .tag{flex-shrink:0}
 
   .recbox{display:flex; align-items:flex-start; gap:14px}
   .recbox .glyph{margin-top:2px}
@@ -450,7 +472,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "3.0";
+const APP_VERSION = "3.1";
 
 /* ================================================================== icons */
 const I = {
@@ -560,14 +582,14 @@ const DEFAULT_PLANS = {
     {id:"pushdown", sets:3, min:10, max:12}]},
   /* Die beiden Beintage wechseln sich ab: einmal steht die Kniebeuge schwer im
      Mittelpunkt, einmal das Kreuzheben. Nie beides schwer am selben Tag. */
-  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge schwer", ex:[
+  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge", ex:[
     {id:"squat",    sets:5, min:5, max:8},
     {id:"dl_light", sets:3, min:8, max:8},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben schwer", ex:[
+  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben", ex:[
     {id:"deadlift", sets:3, min:4, max:6},
     {id:"squat_light",sets:4, min:8, max:8},
     {id:"bss",      sets:3, min:10, max:10},
@@ -589,10 +611,10 @@ const DEFAULT_WEIGHTS = {
   squat:50, squat_light:40, deadlift:60, dl_light:50, rdl:40, bss:0,
   legcurl:25, legext:25, calf:40, abs:0, shrug:40
 };
-/* Der Wochenrhythmus bindet nichts mehr, er ist nur noch Hintergrundwissen:
-   die Empfehlung gibt ihm einen kleinen Bonus, damit die A/B-Abwechslung von
-   Pull Kraft und Pull Volumen nicht verloren geht. Siehe rhythmPlan(). */
-const SCHEDULE = {1:"pullA", 2:"pushA", 4:"pullB", 5:"pushB", 6:"legs"};
+/* Kein Wochenplan mehr. Es gab eine Zwischenstufe, in der der Wochentag noch
+   einen kleinen Bonus gab — der hat aber genau dann entschieden, wenn alles
+   erholt war, und damit wieder der Kalender bestimmt. Die Abwechslung regelt
+   jetzt allein der Rueckstand in recommend(). */
 const DAYS = ["Sonntag","Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag"];
 const TYPE_COLOR = {
   Pull:"var(--cool)", Push:"var(--bone)", Beine:"var(--amber)",
@@ -624,8 +646,7 @@ const isoYear = d => {
 const weekKey = d => isoYear(d) + "-" + String(isoWeek(d)).padStart(2, "0");
 const dayKey = d => d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
 const parseDay = s => { const p = String(s).split("-"); return new Date(+p[0], +p[1]-1, +p[2]); };
-/* planForDate() ist entfallen — der Wochentag bestimmt nichts mehr.
-   Was davon uebrig ist, steckt in rhythmPlan() als Bonus fuer die Empfehlung. */
+/* planForDate() ist entfallen — der Wochentag bestimmt nichts mehr. */
 const kg = n => {
   const v = Math.round(n * 100) / 100;
   return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/0$/,"").replace(".", ","));
@@ -959,13 +980,6 @@ function planShare(pid){
   return out;
 }
 
-/* Der alte Wochenplan lebt nur noch als leichter Bonus weiter. */
-function rhythmPlan(d){
-  const s = SCHEDULE[d.getDay()];
-  if (!s) return null;
-  return s === "legs" ? (isoWeek(d) % 2 === 1 ? "legsA" : "legsB") : s;
-}
-
 /* ------------------------------------------------------------- Tagesform */
 const FORM_FIELDS = [
   {k:"energy", label:"Energie",     low:"Leer",       mid:"Geht so",   high:"Voll da"},
@@ -991,7 +1005,7 @@ const joinNames = arr => arr.length > 1
   ? arr.slice(0, -1).map(x => x.label).join(", ") + " und " + arr[arr.length-1].label
   : (arr[0] ? arr[0].label : "");
 
-function reasonFor(pid, st){
+function reasonFor(pid, st, istAeltester){
   const hot = st.filter(x => x.ratio >= 0.33).sort((a,b) => b.ratio - a.ratio).slice(0, 2);
   const share = planShare(pid);
   const fresh = st.filter(x => (share[x.id] || 0) >= 0.10)
@@ -1004,7 +1018,32 @@ function reasonFor(pid, st){
   if (fresh.length) {
     parts.push(joinNames(fresh) + (fresh.length > 1 ? " sind " : " ist ") + "ausreichend erholt.");
   }
+  /* Wenn nichts belastet ist, ist der Rueckstand der eigentliche Grund —
+     dann muss er auch dastehen, sonst wirkt die Empfehlung willkuerlich. */
+  if (istAeltester) {
+    const d = daysSincePlan(pid);
+    parts.push(d >= 99
+      ? "Diesen Plan hattest du noch nie."
+      : "Und er liegt mit " + Math.floor(d) + " Tagen am längsten zurück.");
+  }
   return parts.join(" ") || "Alles erholt. Freie Wahl.";
+}
+
+/* Wie viele Tage jede Muskelgruppe nichts abbekommen hat. 99 = noch nie.
+   "Erholt" und "vernachlaessigt" sind nicht dasselbe: nach zwei Ruhetagen ist
+   alles erholt, aber die Gruppe, die seit drei Wochen nichts gesehen hat, ist
+   trotzdem eher dran. Genau das trennt diese Funktion. */
+function muscleStale(){
+  const out = {};
+  MUSCLES.forEach(m => out[m] = 99);
+  const best = prsFrom(S.sessions);
+  S.sessions.forEach(s => {
+    const load = sessionLoad(s, best);
+    const d = (Date.now() - sessionTime(s)) / 86400000;
+    if (d < 0) return;
+    MUSCLES.forEach(m => { if ((load[m] || 0) > 0.2 && d < out[m]) out[m] = d; });
+  });
+  return out;
 }
 
 /* Wie lange ein bestimmter Plan zurueckliegt. 99 = noch nie gemacht. */
@@ -1037,32 +1076,44 @@ function recommend(){
         + "Ein Ruhetag oder lockere Bewegung bringt dich weiter als eine erzwungene Einheit."};
   }
 
-  const rhythm = rhythmPlan(new Date());
   const lastLift = S.sessions.slice().reverse().find(s => s.kind === "lift");
   let best = null;
 
+  /* Zwei Groessen entscheiden, beide auf 0..1 normiert:
+     frische  — wie erholt die Muskeln sind, die der Plan trifft
+     rueckstand — wie lange der Plan her ist, gesaettigt nach 10 Tagen
+
+     Wichtig: sind alle Muskeln erholt, ist "frische" fuer jeden Plan gleich 1
+     (die Anteile summieren sich zu 1). Dann entscheidet allein der Rueckstand —
+     also der Plan, der am laengsten liegen geblieben ist. Genau das erwartet man.
+     Der fruehere Wochentags-Bonus ist raus: er hat in exakt dieser Lage den
+     Kalender wieder bestimmen lassen, was v3 ja gerade abschaffen sollte. */
+  const stale = muscleStale();
   Object.keys(plans()).forEach(pid => {
     const share = planShare(pid);
-    let score = 0;
+    let frische = 0, vernachlaessigt = 0;
     MUSCLES.forEach(m => {
       const s = share[m] || 0;
       if (!s) return;
-      score += s * (1 - Math.min(1, by[m].ratio));
+      frische += s * (1 - Math.min(1, by[m].ratio));
+      vernachlaessigt += s * Math.min(1, stale[m] / 14);
     });
-    if (lastLift && lastLift.plan === pid) score -= 0.25;
-    /* Je laenger ein Plan her ist, desto eher ist er wieder dran. Das laesst
-       die beiden Bein- und Pull-Varianten von selbst abwechseln, ohne dass ein
-       Kalender das vorgeben muss. */
-    score += Math.min(0.12, daysSincePlan(pid) * 0.02);
-    if (pid === rhythm) score += 0.08;
+    const rueckstand = Math.min(1, daysSincePlan(pid) / 21);
+    let score = 0.55 * frische + 0.25 * rueckstand + 0.20 * vernachlaessigt;
+    if (lastLift && lastLift.plan === pid) score -= 0.3;
     if (!best || score > best.score) best = {pid:pid, score:score};
   });
 
   if (!best) return {kind:"rest", level:lvl, form:form, state:st, why:"Kein Plan vorhanden."};
 
+  /* Stimmt die Aussage "am laengsten her" wirklich? Nur dann sagen wir es. */
+  const alle = Object.keys(plans());
+  const maxTage = Math.max.apply(null, alle.map(daysSincePlan));
+  const istAeltester = alle.length > 1 && daysSincePlan(best.pid) >= maxTage - 0.01;
+
   return {
     kind:"plan", planId:best.pid, level:lvl, form:form, state:st,
-    why:reasonFor(best.pid, st),
+    why:reasonFor(best.pid, st, istAeltester),
     hint: lvl === "gelb"
       ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
       : null
@@ -1119,44 +1170,70 @@ function goalsCard(pr){
 /* Zwei abstrahierte Koerper, die belasteten Regionen eingefaerbt. Bewusst
    geometrisch gehalten — es soll auf einen Blick lesbar sein, nicht anatomisch
    korrekt. Kopf und Unterschenkel bleiben neutral, sie tragen keine Aussage. */
+/* Athletische Statur mit V-Form, breitem Schultergürtel und stabilem Stand.
+   Alle Gliedmassen werden nur einmal gezeichnet und an der Mittelachse
+   gespiegelt — das haelt die Figur exakt symmetrisch und die Pfade kurz. */
 function silhouette(st){
   const by = muscleMap(st);
-  const f = m => 'fill="var(--lv-' + by[m].level + ')" fill-opacity=".55"';
+  const reg = (m, d) => '<path class="reg" fill="var(--lv-'+by[m].level+')" fill-opacity=".8" d="'+d+'"/>';
+  const neu = d => '<path class="neutral" d="'+d+'"/>';
+  const det = d => '<path class="detail" d="'+d+'"/>';
+  const mirror = inner => inner + '<g transform="translate(200,0) scale(-1,1)">' + inner + '</g>';
+
+  /* gemeinsame neutrale Teile */
+  const head = '<ellipse class="neutral" cx="100" cy="40" rx="20" ry="25"/>'
+             + neu("M89 60 C89 72 88 78 80 83 L120 83 C112 78 111 72 111 60 Z");
+  const armNeutral =
+      neu("M29 186 C25 203 24 222 26 240 L45 243 C49 224 50 205 51 189 Z")   /* Unterarm */
+    + neu("M26 240 C23 252 25 263 31 268 C38 271 44 266 45 257 L45 243 Z");  /* Hand */
+  const shin =
+      neu("M77 330 C73 356 75 388 81 416 L96 416 C98 388 98 356 98 332 Z")
+    + neu("M81 416 C77 424 78 431 86 432 L98 432 L98 416 Z");
+
+  /* ---- Vorderansicht ---- */
+  const frontSide =
+      reg("delts", "M52 97 C39 105 32 120 32 137 C32 149 41 156 51 153 C61 150 66 137 66 123 C66 111 60 102 52 97 Z")
+    + reg("chest", "M66 111 C77 104 90 102 99 105 L99 150 C89 157 75 156 67 147 C63 137 63 120 66 111 Z")
+    + reg("biceps","M32 137 C27 153 26 170 29 186 L51 189 C54 172 56 152 54 136 Z")
+    + armNeutral
+    + reg("legs",  "M74 244 C68 269 70 301 77 330 L98 332 C100 301 100 268 98 246 Z")
+    + shin
+    + det("M85 122 C90 128 94 136 96 146");
 
   const front =
-    '<svg viewBox="0 0 100 200" aria-hidden="true">'
-    + '<circle class="frame" cx="50" cy="17" r="10"/>'
-    + '<path class="frame" d="M44 27 h12"/>'
-    + '<ellipse class="reg" ' + f("delts") + ' cx="27" cy="47" rx="9.5" ry="8.5"/>'
-    + '<ellipse class="reg" ' + f("delts") + ' cx="73" cy="47" rx="9.5" ry="8.5"/>'
-    + '<rect class="reg" ' + f("chest") + ' x="35" y="38" width="30" height="25" rx="8"/>'
-    + '<rect class="reg" ' + f("biceps") + ' x="18" y="57" width="10" height="23" rx="5"/>'
-    + '<rect class="reg" ' + f("biceps") + ' x="72" y="57" width="10" height="23" rx="5"/>'
-    + '<rect class="reg" ' + f("core") + ' x="38" y="65" width="24" height="28" rx="7"/>'
-    + '<rect class="frame" x="17" y="82" width="11" height="20" rx="5"/>'
-    + '<rect class="frame" x="72" y="82" width="11" height="20" rx="5"/>'
-    + '<rect class="reg" ' + f("legs") + ' x="36" y="97" width="12" height="48" rx="6"/>'
-    + '<rect class="reg" ' + f("legs") + ' x="52" y="97" width="12" height="48" rx="6"/>'
-    + '<rect class="frame" x="38" y="148" width="9" height="34" rx="4.5"/>'
-    + '<rect class="frame" x="53" y="148" width="9" height="34" rx="4.5"/>'
+    '<svg viewBox="0 0 200 450" aria-hidden="true">'
+    + head
+    + neu("M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
+    + '<g transform="translate(200,0) scale(-1,1)">'
+    + neu("M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
+    + '</g>'
+    + reg("core",  "M78 150 C88 145 112 145 122 150 L120 212 C116 224 109 230 100 230 C91 230 84 224 80 212 Z")
+    + neu("M80 212 C88 222 112 222 120 212 L127 245 C116 254 84 254 73 245 Z")
+    + det("M100 156 L100 224 M82 172 L118 172 M83 190 L117 190")
+    + mirror(frontSide)
     + '</svg>';
 
+  /* ---- Rueckansicht ---- */
+  const backSide =
+      reg("delts",  "M52 97 C39 105 32 120 32 137 C32 149 41 156 51 153 C61 150 66 137 66 123 C66 111 60 102 52 97 Z")
+    + reg("back",   "M66 110 C57 127 55 160 68 183 C79 199 91 204 99 202 L99 104 C88 101 74 103 66 110 Z")
+    + reg("triceps","M32 137 C27 153 26 170 29 186 L51 189 C54 172 56 152 54 136 Z")
+    + armNeutral
+    + reg("glutes", "M73 214 C65 227 65 251 75 262 C86 271 97 266 99 255 L99 218 Z")
+    + reg("legs",   "M74 262 C69 288 71 312 77 330 L98 332 C100 306 100 284 99 260 Z")
+    + shin
+    + det("M78 128 C84 148 90 168 97 182");
+
   const back =
-    '<svg viewBox="0 0 100 200" aria-hidden="true">'
-    + '<circle class="frame" cx="50" cy="17" r="10"/>'
-    + '<path class="frame" d="M44 27 h12"/>'
-    + '<ellipse class="reg" ' + f("delts") + ' cx="27" cy="47" rx="9.5" ry="8.5"/>'
-    + '<ellipse class="reg" ' + f("delts") + ' cx="73" cy="47" rx="9.5" ry="8.5"/>'
-    + '<rect class="reg" ' + f("back") + ' x="34" y="38" width="32" height="38" rx="9"/>'
-    + '<rect class="reg" ' + f("triceps") + ' x="18" y="57" width="10" height="23" rx="5"/>'
-    + '<rect class="reg" ' + f("triceps") + ' x="72" y="57" width="10" height="23" rx="5"/>'
-    + '<rect class="frame" x="17" y="82" width="11" height="20" rx="5"/>'
-    + '<rect class="frame" x="72" y="82" width="11" height="20" rx="5"/>'
-    + '<rect class="reg" ' + f("glutes") + ' x="36" y="79" width="28" height="17" rx="8"/>'
-    + '<rect class="reg" ' + f("legs") + ' x="36" y="99" width="12" height="46" rx="6"/>'
-    + '<rect class="reg" ' + f("legs") + ' x="52" y="99" width="12" height="46" rx="6"/>'
-    + '<rect class="frame" x="38" y="148" width="9" height="34" rx="4.5"/>'
-    + '<rect class="frame" x="53" y="148" width="9" height="34" rx="4.5"/>'
+    '<svg viewBox="0 0 200 450" aria-hidden="true">'
+    + head
+    + reg("back", "M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
+    + '<g transform="translate(200,0) scale(-1,1)">'
+    + reg("back", "M89 79 C74 84 60 90 50 99 L70 112 C80 106 90 103 100 103 L100 79 Z")
+    + '</g>'
+    + reg("back", "M79 184 C88 193 112 193 121 184 L124 216 C113 224 87 224 76 216 Z")
+    + det("M100 104 L100 214")
+    + mirror(backSide)
     + '</svg>';
 
   return '<div class="bodies">'
@@ -1909,16 +1986,16 @@ function pickSheet(){
     + Object.keys(plans()).map(k => {
         const pl = plans()[k];
         /* Die ersten Übungen als Vorschau: daran erkennt man einen Plan schneller
-           als am Titel, gerade bei den beiden Bein-Varianten. */
-        const preview = pl.ex.slice(0, 3).map(e => exName(e.id)).join(", ")
-                      + (pl.ex.length > 3 ? " …" : "");
-        return '<div class="exrow" data-a="start" data-id="'+k+'" style="align-items:flex-start">'
+           als am Titel, gerade bei den beiden Bein-Varianten. Einzeilig gehalten
+           und bei Bedarf abgeschnitten, damit alle Zeilen gleich hoch bleiben. */
+        const preview = pl.ex.slice(0, 2).map(e => exName(e.id)).join(", ")
+                      + (pl.ex.length > 2 ? " …" : "");
+        return '<button class="pick'+(k === rid ? " on" : "")+'" data-a="start" data-id="'+k+'">'
           + glyph(pl.ex[0].id)
-          + '<div class="body"><div class="nm">'+esc(pl.title)+'</div>'
-          + '<div class="sc">'+esc(preview)+'</div>'
-          + '<div class="sc faint" style="margin-top:3px">zuletzt '+lastPlanLabel(k)+'</div></div>'
+          + '<div class="pbody"><div class="ptitle">'+esc(pl.title)+'</div>'
+          + '<div class="pmeta">'+esc(preview)+' <span class="plast">· '+lastPlanLabel(k)+'</span></div></div>'
           + (k === rid ? '<span class="tag on">Empfohlen</span>' : '')
-          + '</div>';
+          + '</button>';
       }).join("")
     + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
 }
