@@ -74,6 +74,13 @@ neuen einspielen.
 Dateien aus fremden Quellen werden abgewiesen – akzeptiert wird nur ein Export
 dieser App.
 
+## Fremdmaterial
+
+Die Körpergrafik der Muskelgruppen-Anzeige stammt aus
+[Body Muscles](https://github.com/vulovix/body-muscles) von Viktor Vulovic,
+lizenziert unter der Apache License 2.0. Übernommen wurden ausschließlich die
+SVG-Pfaddaten der Muskelregionen; gerendert und eingefärbt wird mit eigenem Code.
+
 ## Aufbau
 
 | Datei | Zweck |
