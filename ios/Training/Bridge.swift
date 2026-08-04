@@ -89,6 +89,12 @@ final class Bridge: NSObject, WKScriptMessageHandler {
         case "health":
             fetchHealth(ask: body["ask"] as? Bool ?? false)
 
+        /* Der Sperrbildschirm. Die Seite schickt bei jeder Aenderung den
+           vollstaendigen Stand, nicht die Aenderung selbst — dann kann nichts
+           auseinanderlaufen, wenn eine Nachricht verlorengeht. */
+        case "live":
+            if #available(iOS 16.2, *) { Live.shared.apply(body) }
+
         case "ready":
             Log.info("bridge: page ready, shell \(body["version"] as? String ?? "?")")
             // Once he has allowed it, the values are simply there when the page

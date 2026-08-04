@@ -895,7 +895,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.4";
+const APP_VERSION = "8.5";
 
 /* ================================================================== icons */
 const I = {
@@ -3396,6 +3396,7 @@ function startRest(exId){
   restDone = false;
   save();
   renderRest();
+  liveMelden();
 }
 /* Ist die Pause um, gehoert der naechste Satz vor Augen. Ohne das sucht man
    nach jeder Pause selbst die Stelle wieder — und genau dabei landet man im
@@ -3419,9 +3420,46 @@ function zumNaechstenSatz(){
   }
 }
 
+/* ---------------------------------------------------------- Live Activity */
+/* Nur in der iOS-Huelle. Gemeldet wird der vollstaendige Stand, nicht die
+   Aenderung — dann kann nichts auseinanderlaufen. Die Huelle verwirft
+   Wiederholungen selbst, deshalb darf das hier aus dem Sekundentakt kommen.
+
+   Die Pause geht als Zeitpunkt hinueber, nicht als Restsekunden: der
+   Sperrbildschirm zaehlt daraus selbst herunter, ohne dass die App auch nur
+   einmal geweckt wird. */
+function naechsterOffenerSatz(){
+  if (!S.active) return null;
+  const plan = planOf(S.active.plan);
+  if (!plan) return null;
+  for (const e of plan.ex) {
+    const saetze = S.active.sets[e.id] || [];
+    const i = saetze.findIndex(s => !s.done);
+    if (i >= 0) return {id:e.id, nr:i + 1, von:saetze.length};
+  }
+  return null;
+}
+function liveMelden(){
+  if (typeof window === "undefined" || !window.__training_live) return;
+  if (!S.active) { window.__training_live(null); return; }
+  const prog = sessionProgress();
+  const s = naechsterOffenerSatz();
+  const pl = planOf(S.active.plan);
+  const laeuft = S.rest && restLeft() > 0;
+  window.__training_live({
+    plan: (pl && pl.title) || "Training",
+    ex: s ? exName(s.id) : "Alle Sätze erledigt",
+    satz: s ? ("Satz " + s.nr + " von " + s.von) : "",
+    done: prog.done, total: prog.total,
+    restEnds: laeuft ? S.rest.endsAt : 0,
+    restFrom: laeuft ? S.rest.endsAt - S.rest.total * 1000 : 0
+  });
+}
+
 function tickRest(){
   const el = document.getElementById("elapsed");
   if (el && S.active) { const t = elapsedText(); if (el.textContent !== t) el.textContent = t; }
+  liveMelden();
   if (!S.active || !S.rest) return;
   const left = restLeft();
   if (left <= 0 && !restDone) { restDone = true; buzz(70); beep(); zumNaechstenSatz(); }
@@ -4499,6 +4537,7 @@ function updateCount(){
   ringZeigen(null);
   const btn = document.querySelector('[data-a="finish"]');
   if (btn) done ? btn.removeAttribute("disabled") : btn.setAttribute("disabled", "");
+  liveMelden();
 }
 /* Before the first set is logged a percentage would always read -100 %, which is
    true but useless. Show the target to beat instead, and switch to the delta

@@ -186,6 +186,23 @@
   };
   window.__training_healthRequest = function () { post({ cmd: "health", ask: true }); };
 
+  /* --------------------------------------------------- live activity ---- */
+  /* The lock screen during a session. The page hands over the complete state
+     every time something changes; nothing here interprets it. Repeats are
+     dropped, because the page calls this from its per-second tick and an
+     activity that is updated every second gets throttled by the system. */
+  var zuletzt = "";
+  window.__training_live = function (state) {
+    var s = JSON.stringify(state);
+    if (s === zuletzt) return;
+    zuletzt = s;
+    post({ cmd: "live", on: !!state, plan: (state && state.plan) || "",
+           ex: (state && state.ex) || "", satz: (state && state.satz) || "",
+           done: (state && state.done) || 0, total: (state && state.total) || 0,
+           restEnds: (state && state.restEnds) || 0,
+           restFrom: (state && state.restFrom) || 0 });
+  };
+
   /* Marker for anything that wants to know it is running inside the shell. */
   window.__training_native = SHELL_VERSION;
 })();

@@ -13,7 +13,7 @@ Activities auf dem Sperrbildschirm.
 |---|---|---|
 | 1 | Projekt, WKWebView-Hülle, JS↔Swift-Brücke, iCloud-Sicherung | steht |
 | 2 | Apple Health lesen | steht |
-| 3 | Live Activity für Pause und Übung | offen |
+| 3 | Live Activity für Pause und Übung | steht |
 
 ## Wie die Daten laufen
 
@@ -76,6 +76,28 @@ nicht. Alles überschreibbar, und im Browser fehlt der Block ersatzlos.
 liefert einfach nichts. Deshalb wird nur gemerkt, dass gefragt wurde, nie die
 Antwort. Das ehrliche Signal ist, ob Werte zurückkommen.
 
+## Live Activity
+
+Eine Aktivität je Einheit, nicht je Pause. Start und Ende alle zwei Minuten
+sähen aus wie eine flackernde Mitteilung und kosten die Geduld des Systems.
+
+Auf Sperrbildschirm und Dynamic Island stehen Plan, Übung, der nächste Satz
+und entweder die laufende Pause oder der Satzstand. **Die Pause geht als
+Zeitpunkt hinüber, nicht als Restsekunden** — `Text(timerInterval:)` und
+`ProgressView(timerInterval:)` zählen daraus selbst herunter, ohne dass die
+App auch nur einmal geweckt wird. Eine Aktivität, die jede Sekunde ein Update
+bräuchte, würde das System binnen Minuten drosseln.
+
+Die Seite meldet über `__training_live()` den **vollständigen** Stand, nicht
+die Änderung — dann kann nichts auseinanderlaufen, wenn eine Nachricht
+verlorengeht. Die Hülle verwirft Wiederholungen selbst, deshalb darf der
+Aufruf aus dem Sekundentakt der Seite kommen.
+
+`TrainingLive` ist ein eigenes Ziel (Widget-Erweiterung, Bundle-ID
+`de.besemedia.training.live`). `LiveAttributes.swift` wird in **beide** Ziele
+übersetzt — nur so sind sich App und Erweiterung über die Form der Daten
+einig.
+
 ## Updates der Web-App
 
 Die App bringt eine Kopie der Web-App mit, damit sie offline und beim ersten
@@ -97,6 +119,9 @@ Verglichen wird über `APP_VERSION` aus `index.html`, numerisch je Stelle —
 xcodebuild -project ios/Training.xcodeproj -scheme Training \
   -destination 'generic/platform=iOS' -configuration Debug build
 ```
+
+Das Schema `Training` baut die Erweiterung mit und bettet sie ein; ein eigener
+Aufruf für `TrainingLive` ist nicht nötig.
 
 `sync-web.sh` läuft als erste Bauphase und kopiert die Web-App nach
 `Training/web/`. Dieser Ordner wird erzeugt und ist nicht im Repo.
@@ -133,6 +158,9 @@ Ausgangspunkt.
 | `Training/Resources/Bridge.js` | alles, was in der Seite passiert |
 | `Training/Store.swift` | Datenhaltung, Schnappschüsse |
 | `Training/Health.swift` | letzte Nacht aus Apple Health, mit Grundlinien |
+| `Training/Live.swift` | startet, aktualisiert und beendet die Live Activity |
+| `Training/LiveAttributes.swift` | die geteilte Form der Daten, in beiden Zielen |
+| `TrainingLive/TrainingLive.swift` | Sperrbildschirm und Dynamic Island |
 | `Training/WebUpdater.swift` | Kopie der Web-App auspacken und aktuell halten |
 | `Training/Log.swift` | Diagnose, in der Konsole des Macs lesbar |
 | `sync-web.sh` | kopiert die Web-App ins Ziel |
