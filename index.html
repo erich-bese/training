@@ -478,7 +478,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "3.4";
+const APP_VERSION = "3.6";
 
 /* ================================================================== icons */
 const I = {
@@ -602,8 +602,10 @@ const DEFAULT_PLANS = {
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  /* Für Tage, an denen nur eine Einheit drin ist: je ein Muster pro Richtung. */
-  full:{id:"full", type:"Ganzkörper", title:"Ganzkörper", ex:[
+  /* Für Tage, an denen nur eine Einheit drin ist: je ein Muster pro Richtung.
+     noSuggest: wird nie automatisch empfohlen. In einem Splitplan wuerde er das
+     sonst regelmaessig gewinnen, weil er alle Gruppen trifft. Waehlbar bleibt er. */
+  full:{id:"full", type:"Ganzkörper", title:"Ganzkörper", noSuggest:true, ex:[
     {id:"squat",    sets:3, min:5, max:8},
     {id:"bench",    sets:3, min:6, max:9},
     {id:"pullup",   sets:4, min:3, max:5},
@@ -1096,6 +1098,7 @@ function recommend(){
      Kalender wieder bestimmen lassen, was v3 ja gerade abschaffen sollte. */
   const stale = muscleStale();
   Object.keys(plans()).forEach(pid => {
+    if (planOf(pid).noSuggest) return;
     const share = planShare(pid);
     let frische = 0, vernachlaessigt = 0;
     MUSCLES.forEach(m => {
@@ -1148,8 +1151,13 @@ let calMonth = null;
 let filter = "Alle";
 let restTick = null;
 
-const setHTML = (html, flat) => {
-  app.innerHTML = '<div class="wrap'+(flat?" flat":"")+' anim">' + html + '</div>';
+/* Die Einblend-Animation darf nur bei einem echten Ansichtswechsel laufen.
+   Sonst zuckt die ganze Seite bei jedem Tippen, weil render() alles neu baut. */
+let lastViewKey = null;
+const setHTML = (html, flat, key) => {
+  const fresh = key !== lastViewKey;
+  lastViewKey = key;
+  app.innerHTML = '<div class="wrap'+(flat?" flat":"")+(fresh?" anim":"")+'">' + html + '</div>';
 };
 const toTop = () => { scroller.scrollTop = 0; };
 
@@ -1822,8 +1830,16 @@ function viewSession(){
       + '</div>'
       + '<div data-sets="'+e.id+'">' + rows.map((s,i) => setRow(e, s, i)).join("") + '</div>'
       + '<button class="addset" data-a="addset" data-id="'+e.id+'">+ Satz</button>'
+      /* Die Historie haengt an der Uebung, nicht am Plan: Klimmzuege sind in
+         Pull Kraft und Pull Volumen dieselbe Uebung. Deshalb muss dastehen, aus
+         welcher Einheit die Zahlen stammen — sonst wirkt es widerspruechlich,
+         wenn ein "noch nie gemachter" Plan Werte von letztem Mal zeigt. */
       + (le ? '<div class="lasttime">'+I.clock+'<span>Letztes Mal <b>'+le.entry.reps.join('·')+'</b> @ <b>'
-          + (le.entry.bw && !le.entry.weight ? 'KG' : kg(le.entry.weight)+' kg')+'</b> · '+dateShort(le.session.date)+'</span></div>' : '')
+          + (le.entry.bw && !le.entry.weight ? 'KG' : kg(le.entry.weight)+' kg')+'</b> · '
+          + dateShort(le.session.date)
+          + (le.session.plan && le.session.plan !== a.plan
+              ? ' · aus ' + esc((planOf(le.session.plan) || {}).title || le.session.type) : '')
+          + '</span></div>' : '')
       + '</div>';
   }).join("");
 
@@ -1859,7 +1875,10 @@ function render(){
   else if (tab === "verlauf") html = viewVerlauf();
   else if (tab === "ziele") html = viewZiele();
   else html = viewMehr();
-  setHTML(html, flat);
+  const key = S.active ? "session:" + S.active.plan
+            : route ? route.view + ":" + (route.id || "")
+            : tab;
+  setHTML(html, flat, key);
   renderTabs();
   renderRest();
 }
@@ -1873,6 +1892,9 @@ const restLeft = () => {
 };
 let restDone = false;
 
+/* Der Balken wird einmal gebaut und danach nur noch beschriftet. Vorher wurde
+   er jede Sekunde komplett neu erzeugt — dadurch lief die Einblend-Animation
+   im Sekundentakt neu, das war das Flackern des Countdowns. */
 function renderRest(){
   if (!S.active || !S.rest) { restEl.innerHTML = ""; return; }
   const left = restLeft();
@@ -1880,13 +1902,30 @@ function renderRest(){
   const totalSec = S.settings.rest || 1;
   const frac = Math.max(0, Math.min(1, left / totalSec));
   const m = Math.floor(left/60), sec = String(left%60).padStart(2,"0");
-  restEl.innerHTML = '<div class="restbar'+(over?" over":"")+'"><div class="inner" style="position:relative">'
-    + '<div class="muted" style="display:flex;align-items:center;gap:9px;font-size:12.5px">'
-    + I.timer + (over ? 'Pause vorbei' : 'Pause') + '</div>'
-    + '<div class="t num">'+(over ? '00:00' : m+':'+sec)+'</div>'
-    + '<button class="tag" data-a="skiprest">'+(over?'OK':'Fertig')+'</button>'
-    + '<div class="prog"><i style="display:block;height:100%;width:'+(frac*100).toFixed(1)+'%;background:var(--amber);transition:width 1s linear"></i></div>'
-    + '</div></div>';
+
+  let bar = restEl.querySelector(".restbar");
+  if (!bar) {
+    restEl.innerHTML = '<div class="restbar"><div class="inner" style="position:relative">'
+      + '<div class="muted" id="restlbl" style="display:flex;align-items:center;gap:9px;font-size:12.5px">'
+      + I.timer + '<span>Pause</span></div>'
+      + '<div class="t num" id="restt">0:00</div>'
+      + '<button class="tag" data-a="skiprest" id="restbtn">Fertig</button>'
+      + '<div class="prog"><i id="restprog" style="display:block;height:100%;background:var(--amber);transition:width 1s linear"></i></div>'
+      + '</div></div>';
+    bar = restEl.querySelector(".restbar");
+  }
+  bar.classList.toggle("over", over);
+  const t = document.getElementById("restt");
+  const txt = over ? "00:00" : m + ":" + sec;
+  if (t && t.textContent !== txt) t.textContent = txt;
+  const lbl = document.querySelector("#restlbl span");
+  const ltxt = over ? "Pause vorbei" : "Pause";
+  if (lbl && lbl.textContent !== ltxt) lbl.textContent = ltxt;
+  const btn = document.getElementById("restbtn");
+  const btxt = over ? "OK" : "Fertig";
+  if (btn && btn.textContent !== btxt) btn.textContent = btxt;
+  const p = document.getElementById("restprog");
+  if (p) p.style.width = (frac*100).toFixed(1) + "%";
 }
 function startRest(){
   S.rest = {endsAt: Date.now() + (S.settings.rest || 120) * 1000};
@@ -1903,12 +1942,23 @@ function tickRest(){
 setInterval(tickRest, 1000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { tickRest(); render(); } });
 
-/* short two-tone chime; the AudioContext is created lazily on a real tap */
+/* iOS gibt Audio nur frei, wenn der Kontext waehrend einer echten Beruehrung
+   entsteht. Frueher wurde er erst beim Ablauf des Timers erzeugt — also aus
+   einem Timer heraus, und blieb damit stumm. Jetzt wird er beim ersten Tippen
+   angelegt und danach nur noch fortgesetzt. */
 let actx = null;
+function unlockAudio(){
+  if (!S.settings.sound) return;
+  try {
+    if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
+  } catch(e){}
+}
 function beep(){
   if (!S.settings.sound) return;
   try {
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === "suspended") actx.resume();
     [880, 1320].forEach((f, i) => {
       const o = actx.createOscillator(), g = actx.createGain();
       o.type = "sine"; o.frequency.value = f;
@@ -1925,9 +1975,19 @@ function beep(){
 /* ================================================================ sheets */
 let sheetState = null;
 function closeSheet(){ sheetState = null; sheetEl.innerHTML = ""; }
+/* Ist bereits ein Sheet offen, wird nur der Inhalt getauscht. Baut man den
+   Rahmen jedes Mal neu, startet die Einblend-Animation bei jedem Tippen von
+   vorn — das ist das Flackern in der Tagesform- und Auswahlansicht. */
 function openSheet(html, state){
   sheetState = state || {};
-  sheetEl.innerHTML = '<div class="scrim" data-a="sheetclose"></div><div class="sheet"><div class="inner">'+html+'</div></div>';
+  const inner = sheetEl.querySelector(".sheet .inner");
+  if (inner) {
+    const top = inner.scrollTop;
+    inner.innerHTML = html;
+    inner.scrollTop = top;
+  } else {
+    sheetEl.innerHTML = '<div class="scrim" data-a="sheetclose"></div><div class="sheet"><div class="inner">'+html+'</div></div>';
+  }
   const f = sheetEl.querySelector(".field");
   if (f) { f.focus(); try { f.select(); } catch(e){} }
 }
@@ -2270,6 +2330,7 @@ function checkUpdate(){
 
 /* ================================================================ events */
 document.addEventListener("click", ev => {
+  unlockAudio();
   const el = ev.target.closest("[data-a]");
   if (!el) return;
   const a = el.dataset.a, id = el.dataset.id;
