@@ -786,6 +786,15 @@
   .mrow+.mrow{border-top:1px solid var(--line)}
   .mrow .nm2{flex:1}
   .mrow .when{color:var(--faint); font-size:11.5px}
+  /* Zustandsmarke: sagt, was zu tun ist, nicht wie stark belastet es ist.
+     Deshalb eine andere Form als die Ampelpunkte daneben. */
+  .stag{
+    padding:2px 7px; border-radius:6px; font-size:9.5px; letter-spacing:.07em;
+    text-transform:uppercase; white-space:nowrap; flex-shrink:0;
+  }
+  .stag.brach{background:rgba(201,106,90,.16); color:#E0A79B}
+  .stag.faellig{background:rgba(233,166,60,.14); color:var(--amber)}
+  .stag.neu{background:rgba(255,255,255,.06); color:var(--faint)}
   .mbar{width:54px; height:3px; border-radius:99px; background:rgba(255,255,255,.08); overflow:hidden}
   .mbar i{display:block; height:100%; border-radius:99px}
 
@@ -854,6 +863,19 @@
   }
   .pick .plast{color:var(--faint)}
   .pick .tag{flex-shrink:0}
+  /* Zustandszeile am Plan. Der Rand faerbt nur bei "ueberlastet" mit — dort
+     ist die Aussage eine Warnung, sonst nur ein Hinweis. */
+  .pick .pz{
+    font-size:11px; margin-top:5px; letter-spacing:.02em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .pick .pz span{color:var(--faint); letter-spacing:0}
+  /* Nicht var(--red): das misst auf der Karte nur 4,0:1. Derselbe helle Ton
+     wie im Warnhinweis kommt auf 7,2:1. */
+  .pick .pz.rot{color:#E0A79B}
+  .pick .pz.brach{color:var(--amber)}
+  .pick .pz.faellig{color:var(--muted)}
+  .pick.warn{border-color:rgba(201,106,90,.3)}
 
   .recbox{display:flex; align-items:flex-start; gap:14px}
   .recbox .glyph{margin-top:2px}
@@ -900,7 +922,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.6";
+const APP_VERSION = "8.7";
 
 /* ================================================================== icons */
 const I = {
@@ -1797,7 +1819,7 @@ const MUSCLES = ["chest","back","delts","biceps","triceps","legs","glutes","core
 const MUSCLE_LABEL = {
   chest:"Brust", back:"Rücken", delts:"Schultern", biceps:"Bizeps",
   triceps:"Trizeps", legs:"Beine", glutes:"Gesäß", core:"Core",
-  grip:"Griff und Unterarme"
+  grip:"Griff"
 };
 
 /* Bewegungsmuster -> Anteil je Muskelgruppe. Greift auf EX[id].pat zu, das es
@@ -1921,10 +1943,15 @@ function muscleState(now, extra){
 
   return MUSCLES.map(m => {
     const ratio = open[m] / REF_LOAD;
+    /* Zwei voneinander unabhaengige Aussagen je Gruppe: `level` sagt, wie
+       belastet sie gerade ist, `stale` wie lange sie nichts gesehen hat.
+       Beides kann gleichzeitig gelten — erholt und trotzdem ueberfaellig ist
+       genau der Zustand, den man sonst uebersieht. */
+    const tage = last[m] === null ? 99 : (t - last[m]) / 86400000;
     return {
       id:m, label:MUSCLE_LABEL[m], open:open[m], ratio:ratio,
       level: ratio >= 0.66 ? "rot" : ratio >= 0.33 ? "gelb" : "gruen",
-      last: last[m]
+      last: last[m], tage: tage, stale: staleLevel(m, tage)
     };
   });
 }
@@ -2012,6 +2039,108 @@ function muscleStale(){
     MUSCLES.forEach(m => { if ((load[m] || 0) > 0.2 && d < out[m]) out[m] = d; });
   });
   return out;
+}
+
+/* ----------------------------------------------------- Vernachlaessigung */
+/* Ab wann eine Gruppe wieder dran ist.
+   Die Antwort steht nicht in der Erholungszeit: erholt zu sein heisst nur,
+   dass wieder trainiert werden *kann*. Der Reiz einer Einheit haelt rund zwei
+   bis drei Tage an; danach passiert nichts mehr, und nach etwa einer Woche
+   ohne Reiz haelt man den Stand bestenfalls. Deshalb zwei Schwellen und nicht
+   eine: "faellig" heisst, der Rhythmus rutscht; "vernachlaessigt" heisst, der
+   Fortschritt in dieser Gruppe steht.
+   Der Griff steht enger, weil er sich am schnellsten erholt und deshalb auch
+   am haeufigsten drankommen darf. */
+const STALE_FAELLIG = {chest:5, back:5, delts:5, biceps:5, triceps:5,
+                       legs:5, glutes:5, core:4, grip:4};
+const STALE_BRACH = 9;
+
+/* Zustand einer Gruppe in Bezug auf die Zeit, nicht auf die Erholung.
+   "neu" ist ausdruecklich kein Vorwurf: was nie trainiert wurde, ist nicht
+   vernachlaessigt — es hat nur noch nicht angefangen. */
+function staleLevel(m, tage){
+  if (tage >= 99) return "neu";
+  if (tage >= STALE_BRACH) return "brach";
+  if (tage >= (STALE_FAELLIG[m] || 5)) return "faellig";
+  return "ok";
+}
+
+/* -------------------------------------------------- systemische Belastung */
+/* Muskeln erholen sich je Gruppe, das Nervensystem nicht. Es traegt alles
+   zusammen — und es ist der Grund, warum jeden Tag trainieren langsamer
+   vorankommt als vier Mal die Woche.
+   Messen laesst es sich nicht. Was hier steht, sind vier Anzeichen, die jedes
+   fuer sich schwach sind und zusammen etwas taugen. Jedes nennt sich selbst,
+   damit die Aussage nachvollziehbar bleibt statt orakelhaft. */
+function systemLoad(){
+  const gruende = [];
+  let punkte = 0;
+
+  /* 1. Tage am Stueck ohne Ruhetag. Zaehlt ab heute rueckwaerts. */
+  const tage = {};
+  S.sessions.forEach(s => { if (s.kind === "lift") tage[s.date] = true; });
+  let folge = 0;
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    if (!tage[dayKey(d)]) { if (i === 0) continue; break; }
+    folge++;
+  }
+  if (folge >= 5) { punkte += 2; gruende.push(folge + " Tage am Stück trainiert"); }
+  else if (folge >= 3) { punkte += 1; gruende.push(folge + " Tage am Stück trainiert"); }
+
+  /* 2. Tagesform der letzten drei Tage. Die eigene Wahrnehmung ist beim
+        Nervensystem die belastbarste Quelle, die es ueberhaupt gibt. */
+  const letzte = [];
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const f = S.form.find(x => x.date === dayKey(d));
+    if (f) letzte.push(f.score / FORM_FIELDS.length);
+  }
+  if (letzte.length) {
+    const mittel = letzte.reduce((a, b) => a + b, 0) / letzte.length;
+    if (mittel <= 1.6) { punkte += 2; gruende.push("Tagesform seit Tagen niedrig"); }
+    else if (mittel <= 2.0) { punkte += 1; gruende.push("Tagesform gedämpft"); }
+  }
+
+  /* 3. Apple Health, falls vorhanden. Jeder Wert gegen seine eigene
+        Grundlinie — ohne die sagt keiner von ihnen etwas. */
+  const h = healthNow();
+  if (h) {
+    if (h.hrv != null && h.hrvBasis && h.hrv <= h.hrvBasis * 0.90) {
+      punkte += 1; gruende.push("HRV unter deinem Schnitt");
+    }
+    if (h.puls != null && h.pulsBasis && h.puls >= h.pulsBasis + 4) {
+      punkte += 1; gruende.push("Ruhepuls erhöht");
+    }
+    if (h.schlaf != null && h.schlaf < 360) {
+      punkte += 1; gruende.push("unter sechs Stunden Schlaf");
+    }
+  }
+
+  /* 4. Volumen der letzten sieben Tage gegen den eigenen Schnitt. Erst ab
+        drei vollen Wochen — vorher ist der "eigene Schnitt" eine einzelne
+        Woche, und daran gemessen ist jede zweite Woche ein Ausreisser. */
+  const wk = weekCounts();
+  const wochen = Object.keys(wk).sort();
+  if (wochen.length >= 4) {
+    const jetzt = wk[wochen[wochen.length - 1]] || 0;
+    const vorher = wochen.slice(0, -1).map(k => wk[k]).sort((a, b) => a - b);
+    const median = vorher[Math.floor(vorher.length / 2)];
+    if (median && jetzt > median * 1.5) {
+      punkte += 1; gruende.push("mehr Einheiten als sonst in dieser Woche");
+    }
+  }
+
+  const level = punkte >= 4 ? "hoch" : punkte >= 2 ? "erhoeht" : "normal";
+  return {
+    level: level, punkte: punkte, gruende: gruende, folge: folge,
+    /* Zwei Fassungen: `kurz` steht in der Zeile neben dem Wort "Nervensystem"
+       und darf es nicht wiederholen, `text` traegt das Blatt als Ueberschrift. */
+    kurz: level === "hoch" ? "Überzogen" : level === "erhoeht" ? "Gefordert" : "Erholt",
+    text: level === "hoch" ? "Nervensystem überzogen"
+        : level === "erhoeht" ? "Nervensystem gefordert"
+        : "Nervensystem erholt"
+  };
 }
 
 /* Wie lange ein bestimmter Plan zurueckliegt. 99 = noch nie gemacht. */
@@ -2129,10 +2258,22 @@ function recommend(){
   const form = formForToday();
   const lvl = form ? form.level : null;
 
+  const sys = systemLoad();
+
   if (lvl === "rot") {
-    return {kind:"rest", level:lvl, form:form, state:st,
+    return {kind:"rest", level:lvl, form:form, state:st, sys:sys,
       why:"Du hast heute wenig Energie, schlechten Schlaf oder starke Erschöpfung angegeben. "
         + "Ein Ruhetag oder lockere Bewegung bringt dich weiter als eine erzwungene Einheit."};
+  }
+
+  /* Die Muskeln koennen erholt sein und der Kopf trotzdem leer. Diese Lage
+     kommt ohne rote Tagesform aus — mehrere schwache Anzeichen zusammen
+     reichen. Wer hier weitertrainiert, sammelt Einheiten statt Fortschritt. */
+  if (sys.level === "hoch") {
+    return {kind:"rest", level:lvl, form:form, state:st, sys:sys,
+      why:"Mehrere Zeichen sprechen für eine Pause: " + sys.gruende.join(", ") + ". "
+        + "Das Nervensystem trägt alles zusammen, nicht je Muskelgruppe — "
+        + "ein Tag Pause bringt hier mehr als eine weitere Einheit."};
   }
 
   const lastLift = S.sessions.slice().reverse().find(s => s.kind === "lift");
@@ -2164,7 +2305,7 @@ function recommend(){
     if (!best || score > best.score) best = {pid:pid, score:score};
   });
 
-  if (!best) return {kind:"rest", level:lvl, form:form, state:st, why:"Kein Plan vorhanden."};
+  if (!best) return {kind:"rest", level:lvl, form:form, state:st, sys:sys, why:"Kein Plan vorhanden."};
 
   /* Stimmt die Aussage "am laengsten her" wirklich? Nur dann sagen wir es. */
   const alle = Object.keys(plans());
@@ -2172,10 +2313,12 @@ function recommend(){
   const istAeltester = alle.length > 1 && daysSincePlan(best.pid) >= maxTage - 0.01;
 
   return {
-    kind:"plan", planId:best.pid, level:lvl, form:form, state:st,
+    kind:"plan", planId:best.pid, level:lvl, form:form, state:st, sys:sys,
     why:reasonFor(best.pid, st, istAeltester),
     hint: lvl === "gelb"
       ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
+      : sys.level === "erhoeht"
+      ? "Erhöhte Grundbelastung (" + sys.gruende.join(", ") + "). Heute nicht bis ans Muskelversagen."
       : null
   };
 }
@@ -2622,10 +2765,16 @@ function silhouette(st, kompakt){
     + '</div>'
     + '<details class="more"><summary><span>Einzelne Muskelgruppen</span></summary>'
     + '<div class="mlist">'
-    + st.slice().sort((a,b) => b.ratio - a.ratio).map(x =>
+    /* Sortiert nach Vernachlaessigung, nicht nach Belastung: was oben steht,
+       ist das, was als naechstes drankommen sollte. Die Belastung selbst zeigt
+       schon die Figur darueber. */
+    + st.slice().sort((a,b) => (b.tage >= 99 ? -1 : b.tage) - (a.tage >= 99 ? -1 : a.tage)).map(x =>
         '<div class="mrow"><i class="dotlv lv-'+x.level+'"></i>'
         + '<span class="nm2">'+x.label+'</span>'
-        + '<span class="when">'+(x.last ? agoPhrase(x.last) : "länger her")+'</span>'
+        + (x.stale === "brach" ? '<span class="stag brach">Vernachlässigt</span>'
+         : x.stale === "faellig" ? '<span class="stag faellig">Fällig</span>'
+         : x.stale === "neu" ? '<span class="stag neu">Noch nie</span>' : '')
+        + '<span class="when">'+(x.last ? agoPhrase(x.last) : "noch nie")+'</span>'
         + '<span class="mbar"><i style="width:'+Math.min(100, Math.round(x.ratio*100))+'%;background:var(--lv-'+x.level+')"></i></span>'
         + '</div>').join("")
     + '</div></details>';
@@ -2695,6 +2844,15 @@ function viewHeute(){
           + (form.level === "gruen" ? "Normal trainieren" : form.level === "gelb" ? "Etwas zurückstecken" : "Ruhetag")
           + '</span>'
         : '<button class="pill" data-a="formask"><i class="dotlv" style="background:var(--lv-none)"></i>Noch nicht erfasst</button>')
+    + '</div>'
+    /* Zweite Zeile: was die Muskeln nicht wissen. Sie steht bewusst unter der
+       Tagesform und nicht daneben — die Tagesform ist die Frage von heute,
+       das hier die Summe der letzten Tage. Antippbar, weil "erhoeht" ohne die
+       Gruende eine Behauptung waere. */
+    + '<div class="row"><span class="note">Nervensystem</span>'
+    + '<button class="pill" data-a="sysinfo"><i class="dotlv lv-'
+    + (rec.sys.level === "hoch" ? "rot" : rec.sys.level === "erhoeht" ? "gelb" : "gruen")
+    + '"></i>' + esc(rec.sys.kurz) + '</button>'
     + '</div></div>';
 
   /* Der Weg ins Training steht vor der Auswertung: erst handeln, dann
@@ -2709,9 +2867,27 @@ function viewHeute(){
 
   /* Muskelgruppen-Ampel, kompakt — die volle Hoehe zweier Figuren hat die
      Startseite frueher zur Haelfte gefuellt. */
+  /* Was zu lange nichts gesehen hat. Erholt zu sein ist kein Ziel — es ist nur
+     die Voraussetzung dafuer, wieder dranzukommen. Ohne diese Zeile faellt
+     eine Gruppe, die kein Plan gerade trifft, still hinten runter. */
+  /* Nach Dauer sortiert und auf drei begrenzt: fuenf Gruppen in einem Satz
+     liest keiner zu Ende, und die laengste Pause ist ohnehin die, die zaehlt. */
+  const kuerzen = list => list.length <= 3 ? joinNames(list)
+    : list.slice(0, 3).map(x => x.label).join(", ") + " und " + (list.length - 3) + " weitere";
+  const brach = rec.state.filter(x => x.stale === "brach").sort((a, b) => b.tage - a.tage);
+  const faellig = rec.state.filter(x => x.stale === "faellig").sort((a, b) => b.tage - a.tage);
   h += '<div class="stack"><div class="eyebrow"><span>Beanspruchte Muskelgruppen</span>'
     + '<span class="faint">' + rec.state.filter(x => x.level === "rot").length + ' belastet</span></div>'
-    + '<div class="card">' + silhouette(rec.state, true) + '</div></div>';
+    + '<div class="card">' + silhouette(rec.state, true) + '</div>'
+    + (brach.length
+        ? '<div class="banner warn" style="margin-top:12px">'+I.info+'<span>'
+          + kuerzen(brach) + ' seit ' + Math.round(Math.min.apply(null, brach.map(x => x.tage)))
+          + ' Tagen ohne Reiz. Nach etwa einer Woche hält man den Stand nur noch.</span></div>'
+        : faellig.length
+        ? '<div class="banner amber" style="margin-top:12px">'+I.info+'<span>'
+          + kuerzen(faellig) + ' wäre wieder dran.</span></div>'
+        : '')
+    + '</div>';
 
   /* Die Daten liegen nur auf diesem Geraet. Ohne Erinnerung faellt ein fehlendes
      Backup erst auf, wenn es zu spaet ist. */
@@ -3985,6 +4161,24 @@ function saveForm(w){
 }
 
 /* ---- Freie Trainingswahl, Empfehlung nur markiert ---- */
+/* Zustand eines Plans: was seine Hauptgruppen gerade sagen.
+   Gewichtet nach Anteil, damit eine Nebengruppe den Plan nicht rot faerbt —
+   dass Bankdruecken den Trizeps mitnimmt, macht einen Push-Tag nicht zum
+   Trizeps-Tag. Nur was mindestens ein Fuenftel des Plans ausmacht, zaehlt. */
+function planZustand(pid, st){
+  const by = muscleMap(st);
+  const share = planShare(pid);
+  const haupt = MUSCLES.filter(m => (share[m] || 0) >= 0.15);
+  if (!haupt.length) return null;
+  const rot = haupt.filter(m => by[m].level === "rot");
+  const brach = haupt.filter(m => by[m].stale === "brach");
+  const faellig = haupt.filter(m => by[m].stale === "faellig" || by[m].stale === "neu");
+  if (rot.length) return {art:"rot", text:"Überlastet", detail:joinNames(rot.map(m => by[m])) + " noch belastet"};
+  if (brach.length) return {art:"brach", text:"Überfällig", detail:joinNames(brach.map(m => by[m])) + " lange nichts"};
+  if (faellig.length) return {art:"faellig", text:"Wäre dran", detail:joinNames(faellig.map(m => by[m])) + " wieder fällig"};
+  return null;
+}
+
 function pickSheet(){
   const rec = recommend();
   const rid = rec.kind === "plan" ? rec.planId : null;
@@ -3997,14 +4191,43 @@ function pickSheet(){
            und bei Bedarf abgeschnitten, damit alle Zeilen gleich hoch bleiben. */
         const preview = pl.ex.slice(0, 2).map(e => exName(e.id)).join(", ")
                       + (pl.ex.length > 2 ? " …" : "");
-        return '<button class="pick'+(k === rid ? " on" : "")+'" data-a="start" data-id="'+k+'">'
+        /* Der Zustand steht an jedem Plan, nicht nur am empfohlenen: die
+           Empfehlung nimmt ihm die Wahl nicht ab, sie ordnet sie nur. Wer
+           bewusst etwas anderes will, soll sehen, was er sich einhandelt. */
+        const z = planZustand(k, rec.state);
+        return '<button class="pick'+(k === rid ? " on" : "")+(z && z.art === "rot" ? " warn" : "")+'"'
+          + ' data-a="start" data-id="'+k+'">'
           + exIcon(pl.ex[0].id, 40, 52)
           + '<div class="pbody"><div class="ptitle">'+esc(pl.title)+'</div>'
-          + '<div class="pmeta">'+esc(preview)+' <span class="plast">· '+lastPlanLabel(k)+'</span></div></div>'
+          + '<div class="pmeta">'+esc(preview)+' <span class="plast">· '+lastPlanLabel(k)+'</span></div>'
+          + (z ? '<div class="pz '+z.art+'">'+esc(z.text)+' · <span>'+esc(z.detail)+'</span></div>' : '')
+          + '</div>'
           + (k === rid ? '<span class="tag on">Empfohlen</span>' : '')
           + '</button>';
       }).join("")
     + '<button class="btn ghost" data-a="sheetclose" style="margin-top:16px">Abbrechen</button>', {});
+}
+
+/* Warum das Nervensystem gerade so dasteht. Ohne die Gruende waere die
+   Einordnung eine Behauptung — und genau daran erkennt man Software, die
+   raet statt zu rechnen. */
+function sysSheet(){
+  const sys = systemLoad();
+  openSheet('<h3>'+esc(sys.text)+'</h3>'
+    + '<div class="sh-sub">Muskeln erholen sich je Gruppe, das Nervensystem trägt alles zusammen. '
+    + 'Es lässt sich nicht messen — das hier sind Anzeichen, jedes für sich schwach.</div>'
+    + (sys.gruende.length
+        ? '<div class="ghd">Was dafür spricht</div><ul class="glist">'
+          + sys.gruende.map(g => '<li>'+esc(g)+'</li>').join("") + '</ul>'
+        : '<div class="ghd">Befund</div><ul class="glist"><li>Nichts, was für eine Pause spricht.</li></ul>')
+    + '<div class="ghd">Woran es sich zeigt</div><ul class="glist">'
+    + '<li>Tage am Stück ohne Ruhetag' + (sys.folge ? ' — gerade ' + sys.folge : '') + '</li>'
+    + '<li>Tagesform der letzten drei Tage</li>'
+    + '<li>HRV, Ruhepuls und Schlaf aus Apple Health, jeweils gegen deinen eigenen Schnitt</li>'
+    + '<li>Einheiten dieser Woche gegen deine sonstigen Wochen</li></ul>'
+    + '<div class="gsrc">Fühlst du dich müde und erschöpft, gilt das mehr als jede dieser Zahlen. '
+    + 'Ein Ruhetag kostet keinen Fortschritt — er ist der Teil, in dem er entsteht.</div>'
+    + '<button class="btn ghost" data-a="sheetclose">Schließen</button>', {});
 }
 
 /* ---- Boxen: nur Dauer und Intensitaet ---- */
@@ -4391,6 +4614,7 @@ document.addEventListener("click", ev => {
   }
   /* Loest die Nachfrage von iOS aus. Die Antwort kommt nicht hier zurueck,
      sondern spaeter ueber `training:health` — dort baut sich das Blatt neu auf. */
+  if (a === "sysinfo") { buzz(); sysSheet(); return; }
   if (a === "healthask") {
     buzz();
     healthWartet = {next:sheetState.next};
