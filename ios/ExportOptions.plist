@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Lädt direkt nach App Store Connect hoch, statt eine .ipa abzulegen.
+	     Von dort geht die App an TestFlight. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>upload</string>
+	<!-- Wird von upload-testflight.sh in eine temporaere Kopie eingesetzt.
+	     So steht die Team-ID nicht im oeffentlichen Repo. -->
+	<key>teamID</key>
+	<string>__TEAM__</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- Absturzberichte werden lesbar, statt nur Adressen zu zeigen. -->
+	<key>uploadSymbols</key>
+	<true/>
+	<!-- Kein automatisches Verwalten der Versionsnummern durch Xcode; die
+	     vergibt das Skript, damit jeder Upload eine eigene bekommt. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>
