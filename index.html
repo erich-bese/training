@@ -522,9 +522,16 @@
      null hoch und damit unsichtbar. */
   #topfade{
     position:fixed; left:0; right:0; top:0; z-index:30; pointer-events:none;
-    height:calc(env(safe-area-inset-top) + 12px);
+    height:calc(env(safe-area-inset-top) + 14px);
+    /* Deckend bis genau zur Statusleiste, erst darunter der weiche Auslauf.
+       Vorher war der Verlauf schon auf halber Hoehe der Insel durchsichtig —
+       in der installierten App scrollten dadurch Saetze neben der Dynamic
+       Island vorbei, und die Kopfzeile darunter sah abgeschnitten aus.
+       Die einfarbige Angabe steht davor als Rueckfall, falls env() in einem
+       Farbverlauf nicht unterstuetzt wird. */
+    background:var(--bg);
     background:linear-gradient(to bottom,
-      var(--bg) 34%, rgba(8,9,10,.74) 70%, rgba(8,9,10,0));
+      var(--bg) 0, var(--bg) env(safe-area-inset-top), rgba(8,9,10,0) 100%);
   }
 
   /* Kompakte Muskelkarte fuer die Startseite: dort zaehlt der schnelle Blick,
@@ -533,12 +540,19 @@
   /* Klebt unter der Statusleiste. Der Verlauf darunter verhindert, dass
      durchscrollender Inhalt an der Kante hart abgeschnitten wirkt. */
   .sesshead{
-    position:sticky; top:calc(env(safe-area-inset-top) - 2px); z-index:25;
-    padding-top:6px; margin:0 -20px 9px; padding-left:20px; padding-right:20px;
+    /* Klebt buendig an der Statusleiste. Der eigene Hintergrund der Zeile ist
+       oben deckend und schliesst damit an den Streifen darueber an — dazwischen
+       darf kein Spalt bleiben, durch den Inhalt sichtbar wird. */
+    position:sticky; top:env(safe-area-inset-top); z-index:25;
+    padding-top:8px; margin:0 -20px 9px; padding-left:20px; padding-right:20px;
     background:linear-gradient(to bottom, var(--bg) 74%, rgba(8,9,10,0));
     padding-bottom:14px;
   }
   .sesshead .card{padding:15px 17px 13px}
+  /* Start und Aufwaermen nebeneinander, der Start traegt das Gewicht. Sie
+     stehen in der Kopfzeile und verschwinden mit dem ersten Satz. */
+  .startrow{display:flex; flex-direction:column; gap:7px; margin-top:14px}
+  .startrow .btn{padding:13px 10px; font-size:14px; margin:0}
   .shrow{display:flex; align-items:center; gap:15px}
   .shtitle{font-size:18px; font-weight:660; letter-spacing:-.025em; white-space:nowrap;
            overflow:hidden; text-overflow:ellipsis}
@@ -925,7 +939,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.8";
+const APP_VERSION = "8.9";
 
 /* ================================================================== icons */
 const I = {
@@ -3353,7 +3367,11 @@ function viewMehr(){
     + '<div class="card stack setrow"><div class="row"><div class="hd">Ton am Pausenende</div>'
     + '<div class="seg"><button data-a="sound" data-id="1" class="'+(S.settings.sound?"on":"")+'">An</button>'
     + '<button data-a="sound" data-id="0" class="'+(!S.settings.sound?"on":"")+'">Aus</button></div></div>'
-    + '<div class="note" style="margin-top:11px">Zusätzlich zur Vibration.</div></div>'
+    + '<div class="note" style="margin-top:11px">Zusätzlich zur Vibration. '
+    + (typeof navigator !== "undefined" && navigator.audioSession
+        ? 'Klingt auch bei stummgeschaltetem iPhone.'
+        : 'Am iPhone nur, wenn der Stummschalter aus ist — das entscheidet das System, nicht die App.')
+    + '</div></div>'
 
     + '<div class="stack"><div class="eyebrow">Plan</div>'
     + '<button class="btn ghost" data-a="planlist">Trainingsplan bearbeiten</button>'
@@ -3515,9 +3533,18 @@ function viewSession(){
     + '<div style="flex:1;min-width:0">'
     + '<div class="shtitle">'+esc(plan.title)+'</div>'
     + '<div class="note" style="margin-top:3px"><span id="cnt">'+done+' / '+total+'</span> Sätze · '
-    + '<span id="elapsed">'+elapsedText()+'</span> · noch <span id="uebrig">'+sessionLeftMin()+'</span> min'
+    + (laeuft()
+        ? '<span id="elapsed">'+elapsedText()+'</span> · noch <span id="uebrig">'+sessionLeftMin()+'</span> min'
+        : 'rund '+sessionLeftMin()+' min')
     + '</div></div></div>'
     + '<div class="shdots" id="shdots">'+muscleDots(sessionBodyState())+'</div>'
+    /* Vor dem Start traegt die Kopfzeile den Start statt der Uhr. Danach ist
+       die Stelle frei fuer die Pause — beide gleichzeitig braeuchte niemand. */
+    + (laeuft() ? '' :
+        '<div class="startrow">'
+        + '<button class="btn" data-a="startnow">Training starten</button>'
+        + '<button class="btn ghost" data-a="warmup">Aufwärmen · 3 min</button>'
+        + '</div>')
     + '<div id="restslot"></div>'
     + '</div></div>';
 
@@ -3676,7 +3703,12 @@ function renderRest(){
   const txt = over ? "00:00" : m + ":" + sec;
   if (t && t.textContent !== txt) t.textContent = txt;
   const lbl = document.querySelector("#restlbl span");
-  const ltxt = over ? "Pause vorbei" : "Pause";
+  /* Dieselbe Zeile traegt drei Dinge: Aufwaermen vor dem Start, die Pause
+     zwischen Saetzen und den kuerzeren Uebergang zwischen zwei Uebungen.
+     Ein eigenes Bauteil je Fall waere dreimal derselbe Balken. */
+  const ltxt = S.rest.warm ? (over ? "Aufgewärmt" : "Aufwärmen")
+             : S.rest.wechsel ? (over ? "Weiter" : "Übergang")
+             : (over ? "Pause vorbei" : "Pause");
   if (lbl && lbl.textContent !== ltxt) lbl.textContent = ltxt;
   const btn = document.getElementById("restbtn");
   const btxt = over ? "OK" : "Fertig";
@@ -3684,9 +3716,31 @@ function renderRest(){
   const p = document.getElementById("restprog");
   if (p) p.style.width = (frac*100).toFixed(1) + "%";
 }
+/* Was nach diesem Satz noch offen ist — daran haengt, wie lange die Pause
+   ueberhaupt sein soll. Drei Faelle, drei Antworten:
+   nichts mehr offen  -> gar keine Pause. Die Einheit ist vorbei.
+   nur noch anderswo  -> Uebergang statt Pause. Das Umbauen dauert ohnehin,
+                         und der naechste Muskel ist ein anderer.
+   dieselbe Uebung    -> die volle Pause. Nur hier zaehlt sie wirklich. */
+function restArt(exId){
+  if (!S.active) return {art:"voll"};
+  const offenHier = (S.active.sets[exId] || []).some(x => !x.done);
+  if (offenHier) return {art:"voll"};
+  const plan = planOf(S.active.plan);
+  const offenSonst = (plan ? plan.ex : []).some(e =>
+    e.id !== exId && !(S.active.skipped || {})[e.id]
+    && (S.active.sets[e.id] || []).some(x => !x.done));
+  return {art: offenSonst ? "wechsel" : "ende"};
+}
+
 function startRest(exId){
-  const dauer = exId ? restFor(exId) : (S.settings.rest || 120);
-  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer};
+  const art = exId ? restArt(exId).art : "voll";
+  if (art === "ende") { S.rest = null; restDone = true; save(); renderRest(); liveMelden(); return; }
+  const voll = exId ? restFor(exId) : (S.settings.rest || 120);
+  /* Der Uebergang ist die halbe Pause, aber nie unter 45 und nie ueber 90
+     Sekunden: darunter kommt man nicht ans Geraet, darueber steht man nur rum. */
+  const dauer = art === "wechsel" ? Math.max(45, Math.min(90, Math.round(voll / 2))) : voll;
+  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer, wechsel: art === "wechsel"};
   restDone = false;
   save();
   renderRest();
@@ -3771,9 +3825,22 @@ document.addEventListener("visibilitychange", () => {
    einem Timer heraus, und blieb damit stumm. Jetzt wird er beim ersten Tippen
    angelegt und danach nur noch fortgesetzt. */
 let actx = null;
+/* Der Stummschalter am iPhone macht Web-Audio stumm — auch den Pausenton, und
+   sein Handy steht immer auf lautlos. Seit Safari 16.4 laesst sich die Absicht
+   erklaeren: `playback` heisst "das ist Inhalt, kein Effekt" und geht am
+   Schalter vorbei. Gibt es die Schnittstelle nicht, aendert sich nichts.
+   In der nativen Huelle ist dasselbe ueber AVAudioSession schon gesetzt. */
+function audioSitzung(){
+  try {
+    if (navigator.audioSession && navigator.audioSession.type !== "playback") {
+      navigator.audioSession.type = "playback";
+    }
+  } catch(e){}
+}
 function unlockAudio(){
   if (!S.settings.sound) return;
   try {
+    audioSitzung();
     if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === "suspended") actx.resume();
   } catch(e){}
@@ -3781,6 +3848,7 @@ function unlockAudio(){
 function beep(){
   if (!S.settings.sound) return;
   try {
+    audioSitzung();
     actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     if (actx.state === "suspended") actx.resume();
     [880, 1320].forEach((f, i) => {
@@ -3819,10 +3887,38 @@ function backupAlter(){
 }
 
 /* Laufzeit der Einheit, im Kopf mitgefuehrt. */
+const laeuft = () => !!(S.active && S.active.startedAt);
 function elapsedText(){
-  if (!S.active) return "";
+  if (!S.active || !S.active.startedAt) return "0 min";
   const min = Math.max(0, Math.round((Date.now() - S.active.startedAt) / 60000));
   return min < 60 ? min + " min" : Math.floor(min/60) + " h " + String(min%60).padStart(2,"0");
+}
+
+/* -------------------------------------------------------- Start der Einheit */
+/* Aufwaermen laeuft ueber denselben Zeitstempel-Timer wie die Satzpause, traegt
+   aber `warm` — dadurch heisst die Zeile anders und die Zeit zaehlt nicht zur
+   Einheit. Der Start ist ein eigener Griff: erst dann laeuft die Uhr. */
+const WARMUP_S = 180;
+
+function startWarmup(){
+  S.rest = {endsAt: Date.now() + WARMUP_S * 1000, total: WARMUP_S, warm: true};
+  restDone = false;
+  save(); renderRest(); liveMelden();
+}
+function startNow(nachOben){
+  if (!S.active || S.active.startedAt) return;
+  S.active.startedAt = Date.now();
+  /* Ein laufendes Aufwaermen endet mit dem Start — sonst liefe die
+     Aufwaermzeile in die erste Satzpause hinein. */
+  if (S.rest && S.rest.warm) { S.rest = null; restDone = true; }
+  keepAwake(true);
+  save();
+  /* Der einzige Neuaufbau waehrend einer Einheit: die Kopfzeile tauscht den
+     Start gegen die Uhr. Ohne `nachOben` bleibt der Scrollstand, weil der
+     Start hier vom ersten abgehakten Satz kommt und nicht von oben. */
+  render();
+  if (nachOben !== false) toTop();
+  liveMelden();
 }
 
 /* ------------------------------------------------- Bildschirm wach halten */
@@ -4294,7 +4390,10 @@ function startSession(id, extra){
   if (extra && extra.length) {
     S.plans = S.plans || JSON.parse(JSON.stringify(DEFAULT_PLANS));
   }
-  S.active = {plan:id, extra:(extra||[]).map(m => m.id), startedAt:Date.now(),
+  /* startedAt bleibt leer: die Einheit ist geoeffnet, aber nicht gestartet.
+     Vorher lief die Uhr, sobald man nur nachsehen wollte, welche Uebungen
+     anstehen — im echten Verlauf standen dadurch 186, 128 und 103 Minuten. */
+  S.active = {plan:id, extra:(extra||[]).map(m => m.id), startedAt:0,
               sets:sets, weights:weights, cfg:cf, skipped:{}};
   S.rest = null;
   keepAwake(true);
@@ -4328,7 +4427,11 @@ function finishSession(){
     kind:"lift", plan:plan.id, type:plan.type,
     /* Gedeckelt: laeuft eine Einheit ueber Nacht offen weiter, ist die
        gemessene Dauer wertlos. Dann lieber keine Angabe als eine falsche. */
-    minutes:(() => { const m = Math.round((Date.now() - a.startedAt)/60000);
+    /* Ohne Start gibt es keine Dauer — 0 heisst "keine Angabe", nicht "null
+       Minuten". Die Obergrenze bleibt: eine offen liegengebliebene Einheit
+       soll nicht als sechs Stunden im Verlauf stehen. */
+    minutes:(() => { if (!a.startedAt) return 0;
+                     const m = Math.round((Date.now() - a.startedAt)/60000);
                      return (m >= 1 && m <= 240) ? m : 0; })(),
     effort:null, form:formForToday(), note:"", entries:entries
   };
@@ -4618,6 +4721,8 @@ document.addEventListener("click", ev => {
   }
   /* Loest die Nachfrage von iOS aus. Die Antwort kommt nicht hier zurueck,
      sondern spaeter ueber `training:health` — dort baut sich das Blatt neu auf. */
+  if (a === "startnow") { buzz(14); unlockAudio(); startNow(); return; }
+  if (a === "warmup") { buzz(13); unlockAudio(); startWarmup(); return; }
   if (a === "sysinfo") { buzz(); sysSheet(); return; }
   if (a === "healthask") {
     buzz();
@@ -4817,8 +4922,16 @@ document.addEventListener("click", ev => {
     updateSub(cfg); updateDuel(); return;
   }
   if (a === "log") {
+    /* Wer den ersten Satz abhakt, hat angefangen — auch ohne auf Start zu
+       tippen. Sonst stuende am Ende eine Einheit ohne Dauer. */
+    const erster = !S.active.startedAt;
     const s = S.active.sets[id][i];
     s.done = !s.done; save(); buzz(13);
+    if (erster) {
+      startNow(false);
+      if (s.done) startRest(id);
+      return;
+    }
     const row = document.querySelector('[data-row="'+id+':'+i+'"]');
     if (row) {
       row.classList.toggle("done", s.done);
