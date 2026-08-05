@@ -965,7 +965,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.0";
+const APP_VERSION = "9.1";
 
 /* ================================================================== icons */
 const I = {
@@ -1588,7 +1588,7 @@ const EMPTY = () => ({
   rest:null,              /* {endsAt} — a timestamp, so backgrounding cannot stall it */
   form:[],                /* Tagesform pro Tag, auch ohne Training */
   griffNachgetragen:false,/* einmaliges Nachtragen des Haengens in eigene Plaene */
-  settings:{bodyweight:80, rest:120, sound:true, plates:[1.25, 2.5, 5]}
+  settings:{bodyweight:80, rest:120, sound:true, plates:[1.25, 2.5, 5], eccMax:10}
 });
 
 let S = EMPTY();
@@ -1815,13 +1815,14 @@ function evaluate(plan, entries, weights){
       return;
     }
     if (e.reps.length >= cfg.sets && e.reps.every(r => r >= cfg.max)) {
-      /* War der letzte Satz locker, war das Gewicht zwei Stufen zu leicht.
-         Dieselbe Regel wie im Vorschlag vor der Einheit — sonst empfaehle die
-         App etwas anderes, als sie danach rechnet. */
-      const stufen = e.rir >= 3 ? 2 : 1;
-      next[cfg.id] = snapTo(w + stufen * inc, inc);
-      changes.push({id:cfg.id, from:w, to:next[cfg.id],
-                    why:"alle Sätze im Ziel" + (stufen > 1 ? ", noch Luft" : "")});
+      /* Dieselbe Regel wie im Vorschlag vor der Einheit. Steigt das
+         exzentrische Zusatzgewicht, wandert das direkt in die Einstellung der
+         Uebung — es haengt nicht am Plan, sondern am Geraet. */
+      const st = steigerung(cfg.id, w, +e.ecc || 0, e.rir, hauptZuletztErhoeht(cfg.id, null));
+      next[cfg.id] = st.weight;
+      if (st.ecc !== (+e.ecc || 0)) setCfg(cfg.id, {ecc: st.ecc});
+      changes.push({id:cfg.id, from:w, to:st.weight, ecc:st.ecc !== (+e.ecc||0) ? st.ecc : null,
+                    why:st.why});
       return;
     }
     const past = S.sessions.filter(s => s.entries.some(x => x.id === cfg.id && x.reps.length))
@@ -1847,33 +1848,111 @@ function evaluate(plan, entries, weights){
    nichts mehr ging, 3 heisst es war locker. Nur damit laesst sich "alle Saetze
    im Ziel" ueberhaupt einordnen — zehn Wiederholungen mit drei in Reserve sind
    etwas anderes als zehn am Limit. */
+/* Wie hoch das exzentrische Zusatzgewicht ueberhaupt gehen kann. Steht in den
+   Einstellungen, weil es eine Eigenschaft des Geraets ist und nicht der App —
+   und weil sich der Nutzer beim Wert selbst nicht sicher war. */
+const eccMax = () => +S.settings.eccMax || 10;
+
+/* Die Entscheidung, was nach einer erfuellten Einheit steigt. Genau eine
+   Stelle, von der aus beide Seiten lesen: der Vorschlag vor der Uebung und
+   die Auswertung danach. Standen sie getrennt, wuerde die App etwas anderes
+   empfehlen als sie hinterher rechnet — und niemand merkt es.
+
+   Der Grundgedanke: das Hauptgewicht traegt den Fortschritt, das exzentrische
+   Zusatzgewicht ist ein zweites Gleis. Wer beides gleichzeitig hochzieht,
+   steigert zweimal — deshalb wechseln sie sich ab, ausser der letzte Satz war
+   ausdruecklich locker. Dann war schlicht zu wenig dran. */
+function steigerung(exId, w, ecc, rir, hauptZuletzt){
+  const inc = incOf(exId);
+  const frei = ecc > 0 && ecc < eccMax();
+  const locker = rir >= 3;
+
+  if (!ecc) {
+    return {weight: snapTo(w + (locker ? 2 : 1) * inc, inc), ecc: ecc,
+            why: locker ? "alle Sätze im Ziel, noch Luft" : "alle Sätze im Ziel"};
+  }
+  if (locker && frei) {
+    return {weight: snapTo(w + inc, inc), ecc: ecc + 1,
+            why: "alle Sätze im Ziel, noch Luft — beides eine Stufe"};
+  }
+  if (locker) {
+    return {weight: snapTo(w + 2 * inc, inc), ecc: ecc,
+            why: "alle Sätze im Ziel, noch Luft — exzentrisch am Anschlag"};
+  }
+  if (hauptZuletzt && frei) {
+    return {weight: w, ecc: ecc + 1,
+            why: "alle Sätze im Ziel — diesmal exzentrisch"};
+  }
+  return {weight: snapTo(w + inc, inc), ecc: ecc, why: "alle Sätze im Ziel"};
+}
+
+/* Ob beim letzten Mal das Hauptgewicht gestiegen ist. Daran haengt, wer als
+   Naechstes dran ist. Ohne zwei vergleichbare Eintraege: nein. */
+function hauptZuletztErhoeht(exId, bisSessionId){
+  const list = [];
+  for (let i = S.sessions.length - 1; i >= 0 && list.length < 2; i--) {
+    const s = S.sessions[i];
+    if (bisSessionId && s.id === bisSessionId) continue;
+    const e = (s.entries || []).find(x => x.id === exId && x.reps.length);
+    if (e) list.push(e);
+  }
+  if (list.length < 2) return false;
+  return (list[0].weight || 0) > (list[1].weight || 0);
+}
+
 function gewichtVorschlag(exId, planId){
   const pl = planOf(planId || (S.active && S.active.plan));
   const cfg = pl && (pl.ex || []).find(x => x.id === exId);
   const le = lastEntry(exId);
   if (!cfg || !le) return null;
 
-  const w = le.entry.weight || 0;
+  /* Nicht das Gewicht von letztem Mal, sondern das hoehere von beiden: die
+     Auswertung nach der letzten Einheit hat den Wert womoeglich schon
+     hochgesetzt. Ohne das schlaegt die App vor, hinter ihre eigene
+     Entscheidung zurueckzugehen — genau das stand hier eine Version lang. */
+  const gesetzt = (S.active && S.active.weights[exId] !== undefined)
+    ? +S.active.weights[exId] : +S.weights[exId] || 0;
+  const w = Math.max(+le.entry.weight || 0, gesetzt || 0);
   const inc = incOf(exId);
   const reps = le.entry.reps;
   const rir = le.entry.rir;
   const summe = reps.reduce((a,b) => a+b, 0);
 
   /* Ein Wechsel der Zaehlweise macht die letzte Einheit unvergleichbar: 20 kg
-     je Seite sind nicht 20 kg gesamt. Dann lieber nichts sagen. */
+     je Seite sind nicht 20 kg gesamt. Dann lieber nichts sagen.
+     Das exzentrische Zusatzgewicht faellt ausdruecklich nicht darunter — es
+     ist Teil dessen, worueber der Vorschlag entscheidet. Steht es schon hoeher
+     als beim letzten Mal, hat er selbst vorgelegt: dann ist das Hauptgewicht
+     an der Reihe und nicht noch einmal die Exzentrik. */
   const jetzt = (S.active && S.active.cfg[exId]) || cfgOf(exId);
-  if (!!jetzt.perSide !== !!le.entry.perSide || (jetzt.ecc || 0) !== (le.entry.ecc || 0)) return null;
+  if (!!jetzt.perSide !== !!le.entry.perSide) return null;
+  const eccAlt = +le.entry.ecc || 0;
+  const eccNun = +jetzt.ecc || 0;
+  const eccSchonHoch = eccNun > eccAlt;
 
   const oben = cfg.total ? summe >= cfg.total[1]
              : (reps.length >= cfg.sets && reps.every(r => r >= cfg.max));
 
   if (oben) {
-    /* War auch der letzte Satz locker, war das Gewicht zwei Stufen zu leicht.
-       Ohne Angabe bleibt es bei einer — raten waere hier teuer. */
-    const stufen = rir >= 3 ? 2 : 1;
-    return {von:w, auf:snapTo(w + stufen * inc, inc), art:"hoch",
-            warum: cfg.total ? summe + " Wdh. gesamt geschafft" : "alle Sätze im Ziel",
-            dazu: rir >= 3 ? "und noch Luft" : rir === 0 ? "aber nichts mehr übrig" : ""};
+    /* Steht das exzentrische Zusatzgewicht schon ueber dem letzten Mal, ist die
+       Steigerung fuer diese Uebung erledigt — sonst boete die App direkt danach
+       auch noch das Hauptgewicht an und haette beides auf einmal erhoeht.
+       Genau das soll der Wechsel verhindern. */
+    if (eccSchonHoch) {
+      return {von:w, auf:w, eccVon:eccNun, eccAuf:eccNun, art:"hoch",
+              warum:"exzentrisch eine Stufe höher", dazu:""};
+    }
+    const ecc = Math.max(eccAlt, eccNun);
+    const st = steigerung(exId, w, ecc, rir, hauptZuletztErhoeht(exId));
+    /* Aendert sich gar nichts, ist das kein Vorschlag, sondern eine Sackgasse:
+       alles im Ziel und trotzdem nichts zu steigern gibt es nur, wenn das
+       Geraet am Anschlag ist. Dann sagt die App das auch so. */
+    if (st.weight === w && st.ecc === ecc) {
+      return {von:w, auf:w, art:"halten", warum:"alles im Ziel, aber nichts mehr zu steigern", dazu:""};
+    }
+    return {von:w, auf:st.weight, eccVon:ecc, eccAuf:st.ecc, art:"hoch",
+            warum: cfg.total ? summe + " Wdh. gesamt geschafft" : st.why,
+            dazu: rir === 0 ? "aber nichts mehr übrig" : ""};
   }
 
   const frueher = S.sessions.filter(s => s.entries.some(x => x.id === exId && x.reps.length))
@@ -3444,6 +3523,10 @@ function viewMehr(){
     + '<div class="card setrow"><div class="hd">Körpergewicht</div>'
     + '<div class="note" style="margin-top:3px">Zählt bei Klimmzügen, Dips und Bauch ins Volumen.</div>'
     + '<div class="ctl">' + stepper("bw", "bodyweight", S.settings.bodyweight, 0.5, "kg") + '</div></div>'
+    + '<div class="card setrow"><div class="hd">Exzentrisch höchstens</div>'
+    + '<div class="note" style="margin-top:3px">Was das Gerät im Absenken zusätzlich auflegen kann. '
+    + 'Bis hierhin schlägt die App exzentrisch vor, darüber nur noch das Hauptgewicht.</div>'
+    + '<div class="ctl">' + stepper("eccmax", "eccMax", eccMax(), 1, "kg") + '</div></div>'
     + '<div class="card setrow"><div class="hd">Satzpause</div>'
     + '<div class="note" style="margin-top:3px">Läuft auf Zeitstempel weiter – auch wenn die App im Hintergrund oder geschlossen ist.</div>'
     + '<div class="ctl">' + stepper("rest", "rest", S.settings.rest, 15, "s") + '</div></div>'
@@ -3711,11 +3794,21 @@ function vorschlagZeile(exId, aktuell){
     return '<div class="vor halten"><span>' + esc(v.warum)
       + (v.dazu ? ' ' + esc(v.dazu) : '') + ' — Gewicht halten</span></div>';
   }
-  if (Math.abs((aktuell || 0) - v.auf) < 0.001) {
-    return '<div class="vor an"><span>' + kg(v.auf) + ' kg übernommen · ' + esc(v.warum) + '</span></div>';
+  const eccJetzt = +(((S.active && S.active.cfg[exId]) || cfgOf(exId)).ecc) || 0;
+  const eccZiel = v.eccAuf === undefined ? eccJetzt : v.eccAuf;
+  const gleich = Math.abs((aktuell || 0) - v.auf) < 0.001 && eccZiel === eccJetzt;
+  /* Beide Groessen in einer Zeile — sie gehoeren zusammen, und getrennt
+     stuenden zwei Vorschlaege untereinander, von denen man einen uebersieht. */
+  const ziel = kg(v.auf) + ' kg'
+    + (eccZiel !== eccJetzt ? ' · exzentrisch +' + kg(eccZiel) : '');
+
+  if (gleich) {
+    return '<div class="vor an"><span>' + kg(v.auf) + ' kg'
+      + (eccJetzt ? ' · exz. +' + kg(eccJetzt) : '') + ' übernommen · ' + esc(v.warum) + '</span></div>';
   }
-  return '<button class="vor ' + v.art + '" data-a="vorok" data-id="' + exId + '" data-d="' + v.auf + '">'
-    + '<span><b>' + (v.art === "hoch" ? "Vorschlag " : "Zurück auf ") + kg(v.auf) + ' kg</b> · '
+  return '<button class="vor ' + v.art + '" data-a="vorok" data-id="' + exId + '" data-d="' + v.auf + '"'
+    + ' data-e="' + eccZiel + '">'
+    + '<span><b>' + (v.art === "hoch" ? "Vorschlag " : "Zurück auf ") + ziel + '</b> · '
     + esc(v.warum) + (v.dazu ? ' ' + esc(v.dazu) : '') + '</span>'
     + '<span class="vortag">Übernehmen</span></button>';
 }
@@ -4849,6 +4942,13 @@ document.addEventListener("click", ev => {
   if (a === "vorok") {
     buzz(13);
     S.active.weights[id] = +d;
+    const e = +el.getAttribute("data-e");
+    /* Das exzentrische Zusatzgewicht haengt an der Uebung, nicht an dieser
+       Einheit — sonst stuende es beim naechsten Mal wieder auf dem alten Wert. */
+    if (!isNaN(e)) {
+      S.active.cfg[id] = Object.assign(S.active.cfg[id] || {}, {ecc:e});
+      setCfg(id, {ecc:e});
+    }
     save(); render(); return;
   }
   if (a === "rir") {
@@ -4922,11 +5022,13 @@ document.addEventListener("click", ev => {
   if (a === "filter") { filter = id; render(); return; }
 
   /* ---- settings ---- */
-  if (a === "bw" || a === "rest") {
+  if (a === "bw" || a === "rest" || a === "eccmax") {
     buzz();
-    const key = a === "bw" ? "bodyweight" : "rest";
-    let v = S.settings[key] + d;
-    v = key === "rest" ? Math.min(600, Math.max(15, v)) : Math.max(0, v);
+    const key = a === "bw" ? "bodyweight" : a === "rest" ? "rest" : "eccMax";
+    let v = (a === "eccmax" ? eccMax() : S.settings[key]) + d;
+    v = key === "rest" ? Math.min(600, Math.max(15, v))
+      : key === "eccMax" ? Math.min(50, Math.max(0, v))
+      : Math.max(0, v);
     S.settings[key] = v; save(); render(); return;
   }
   if (a === "bw-edit" || a === "rest-edit") {
