@@ -451,6 +451,17 @@
   .set.done .reps{color:var(--amber)}
   /* Sekunden statt Wiederholungen: die Einheit steht am Wert, sonst liest man
      beim Haengen 45 als Wiederholungen. */
+  /* Stoppuhr. Die Zahl traegt das Blatt allein — daneben steht nur ein Knopf,
+     weil man sie mit ausgestreckten Armen aus zwei Metern lesen koennen soll. */
+  .uhr{
+    font-size:76px; font-weight:720; letter-spacing:-.05em; text-align:center;
+    font-variant-numeric:tabular-nums; color:var(--bone);
+    margin:22px 0 26px; line-height:1;
+  }
+  .uhr.vor{color:var(--amber); font-size:96px}
+  .uhrbtn{color:var(--amber)}
+  .uhrbtn svg{stroke:currentColor}
+
   .set .reps small{font-size:11px; font-weight:600; color:var(--muted); margin-left:2px; letter-spacing:0}
   .addset{color:var(--muted); font-size:12.5px; padding:11px 0 0; font-weight:520}
 
@@ -519,6 +530,13 @@
   .cal .dot{width:4px; height:4px; border-radius:3px; background:transparent}
 
   .chips{display:flex; gap:7px; margin-bottom:13px; overflow-x:auto; scrollbar-width:none}
+  /* Bei Auswahlen, die vollstaendig sichtbar sein muessen: umbrechen statt
+     seitlich wegscrollen. Eine Antwortmoeglichkeit, die man erst finden muss,
+     ist keine.
+     Nicht `.wrap` nennen — so heisst schon der Hauptcontainer der Seite, und
+     der bringt 132 px Innenabstand mit. Das hat hier bereits eine Fassung
+     lang eine Luecke von 132 px unter die Knoepfe gesetzt. */
+  .chips.umbruch{flex-wrap:wrap; overflow:visible}
   .chips::-webkit-scrollbar{display:none}
   .chip{
     padding:8px 14px; border-radius:99px; font-size:13px; font-weight:540;
@@ -965,7 +983,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.1";
+const APP_VERSION = "9.2";
 
 /* ================================================================== icons */
 const I = {
@@ -1827,7 +1845,9 @@ function evaluate(plan, entries, weights){
     }
     const past = S.sessions.filter(s => s.entries.some(x => x.id === cfg.id && x.reps.length))
       .slice(-2).map(s => s.entries.find(x => x.id === cfg.id));
-    const weak = past.concat([e]).filter(x => x.reps.length &&
+    /* Dieselbe Ausnahme wie im Vorschlag: eine abgebrochene Uebung ist kein
+       Beleg dafuer, dass das Gewicht zu hoch war. */
+    const weak = past.concat([e]).filter(x => x.reps.length && !x.abbruch &&
       x.reps.reduce((a,b) => a+b, 0) / x.reps.length < cfg.min);
     if (weak.length >= 3 && w > 0) {
       next[cfg.id] = snapTo(w * 0.9, inc);
@@ -1930,6 +1950,14 @@ function gewichtVorschlag(exId, planId){
   const eccNun = +jetzt.ecc || 0;
   const eccSchonHoch = eccNun > eccAlt;
 
+  /* Wurde die Uebung letztes Mal wegen Schmerzen abgebrochen, ist mehr Gewicht
+     die falsche Antwort — egal wie die Wiederholungen aussahen. Erst wieder
+     schmerzfrei durchziehen, dann steigern. */
+  if (le.entry.abbruch === "Schmerzen") {
+    return {von:w, auf:w, art:"halten",
+            warum:"letztes Mal wegen Schmerzen abgebrochen", dazu:""};
+  }
+
   const oben = cfg.total ? summe >= cfg.total[1]
              : (reps.length >= cfg.sets && reps.every(r => r >= cfg.max));
 
@@ -1957,7 +1985,10 @@ function gewichtVorschlag(exId, planId){
 
   const frueher = S.sessions.filter(s => s.entries.some(x => x.id === exId && x.reps.length))
     .slice(-3).map(s => s.entries.find(x => x.id === exId));
-  const schwach = frueher.filter(x => x.reps.length && !cfg.total &&
+  /* Ein Abbruch ist kein zu schweres Gewicht. Zaehlte er mit, wuerde die App
+     nach drei unterbrochenen Einheiten das Gewicht senken, obwohl die Saetze,
+     die stattfanden, sauber waren. */
+  const schwach = frueher.filter(x => x.reps.length && !cfg.total && !x.abbruch &&
     x.reps.reduce((a,b) => a+b, 0) / x.reps.length < cfg.min);
   if (schwach.length >= 3 && w > 0) {
     return {von:w, auf:snapTo(w * 0.9, inc), art:"runter", warum:"dreimal unter dem Ziel", dazu:""};
@@ -3762,6 +3793,7 @@ function viewSession(){
           + dateShort(le.session.date)
           + (le.session.plan && le.session.plan !== a.plan
               ? ' · aus ' + esc((planOf(le.session.plan) || {}).title || le.session.type) : '')
+          + (le.entry.abbruch ? ' · <b>abgebrochen: '+esc(le.entry.abbruch)+'</b>' : '')
           + '</span></div>' : '')
       + '</div>';
   }).join("");
@@ -3781,6 +3813,9 @@ function setRow(e, s, i){
     + '<button class="rb xs" data-a="reps" data-id="'+e.id+'" data-i="'+i+'" data-d="-'+schrittVon(e.id)+'">'+I.minus+'</button>'
     + '<div class="reps num">'+s.reps+(istZeit(e.id) ? '<small>s</small>' : '')+'</div>'
     + '<button class="rb xs" data-a="reps" data-id="'+e.id+'" data-i="'+i+'" data-d="'+schrittVon(e.id)+'">'+I.plus+'</button></div>'
+    + (istZeit(e.id) && !s.done
+        ? '<button class="rb uhrbtn" data-a="uhr" data-id="'+e.id+'" data-i="'+i+'">'+I.timer+'</button>'
+        : '')
     + '<button class="rb'+(s.done?" on":"")+'" data-a="log" data-id="'+e.id+'" data-i="'+i+'">'+I.check+'</button></div>';
 }
 
@@ -3828,6 +3863,91 @@ function rirZeile(exId, rows){
     + '<div class="seg">' + RIR_STUFEN.map(o =>
         '<button data-a="rir" data-id="'+exId+'" data-d="'+o[0]+'" class="'+(cur === o[0] ? "on" : "")+'">'
         + o[1] + '</button>').join("") + '</div></div>';
+}
+
+/* ------------------------------------------------------------- Stoppuhr */
+/* Fuer Uebungen, deren Zahl Sekunden sind. Ohne sie schaetzt man die Zeit am
+   Ende — und aus 35, 25, 15 Sekunden wird eine Zahlenreihe, die nichts misst.
+
+   Der Ablauf folgt dem, was am Geraet tatsaechlich passiert: fuenf Sekunden
+   Vorlauf, um an die Stange zu kommen, dann laeuft sie. Am Ende zieht sie
+   zwei Sekunden ab — so lange braucht der Weg vom Loslassen zurueck zum
+   Telefon. Ohne diesen Abzug staende dort dauerhaft zu viel. */
+const UHR_VORLAUF = 5, UHR_REAKTION = 2;
+let uhr = null;          /* {exId, i, phase:"vor"|"laeuft", ab} */
+let uhrTakt = null;
+
+function uhrSheet(exId, i){
+  if (!S.active) return;
+  uhr = {exId:exId, i:i, phase:"vor", ab:Date.now() + UHR_VORLAUF * 1000};
+  unlockAudio();
+  uhrZeichnen();
+  if (uhrTakt) clearInterval(uhrTakt);
+  uhrTakt = setInterval(uhrTick, 100);
+}
+
+/* Der Zaehler laeuft auf Zeitstempeln, nicht auf einer hochgezaehlten Zahl:
+   ein Fenster im Hintergrund drosselt den Takt, die Uhrzeit bleibt richtig. */
+function uhrStand(){
+  if (!uhr) return 0;
+  return uhr.phase === "vor"
+    ? Math.max(0, Math.ceil((uhr.ab - Date.now()) / 1000))
+    : Math.max(0, Math.floor((Date.now() - uhr.ab) / 1000));
+}
+
+function uhrZeichnen(){
+  if (!uhr) return;
+  const wert = uhrStand();
+  const vor = uhr.phase === "vor";
+  openSheet('<h3>'+esc(exName(uhr.exId))+'</h3>'
+    + '<div class="sh-sub">'+(vor ? 'Gleich geht es los — an die Stange.'
+        : 'Halten. Sobald du loslässt, auf Stopp.')+'</div>'
+    + '<div class="uhr'+(vor ? " vor" : "")+'" id="uhrwert">'+(vor ? wert : uhrText(wert))+'</div>'
+    + (vor
+        ? '<button class="btn ghost" data-a="uhrweg">Abbrechen</button>'
+        : '<button class="btn" data-a="uhrstop">Stopp</button>'
+          + '<div class="note" style="padding:12px 4px 0;text-align:center">'
+          + 'Die letzten '+UHR_REAKTION+' Sekunden bis zum Telefon werden abgezogen.</div>')
+    , {});
+}
+const uhrText = sek => Math.floor(sek/60) + ":" + String(sek % 60).padStart(2, "0");
+
+function uhrTick(){
+  if (!uhr) { clearInterval(uhrTakt); uhrTakt = null; return; }
+  const wert = uhrStand();
+  if (uhr.phase === "vor") {
+    if (wert <= 0) { uhr.phase = "laeuft"; uhr.ab = Date.now(); buzz(45); beep(); uhrZeichnen(); return; }
+    const el = document.getElementById("uhrwert");
+    if (el && el.textContent !== String(wert)) { el.textContent = wert; buzz(10); }
+    return;
+  }
+  const el = document.getElementById("uhrwert");
+  const t = uhrText(wert);
+  if (el && el.textContent !== t) el.textContent = t;
+}
+
+function uhrWeg(){
+  uhr = null;
+  if (uhrTakt) { clearInterval(uhrTakt); uhrTakt = null; }
+  closeSheet();
+}
+
+/* Uebernimmt den Wert und hakt den Satz gleich ab — genau dafuer stand man ja
+   mit dem Telefon in der Hand da. Damit laeuft auch die Pause an. */
+function uhrStop(){
+  if (!uhr || uhr.phase !== "laeuft") { uhrWeg(); return; }
+  const roh = Math.floor((Date.now() - uhr.ab) / 1000);
+  const wert = Math.max(0, roh - UHR_REAKTION);
+  const exId = uhr.exId, i = uhr.i;
+  const satz = S.active && S.active.sets[exId] && S.active.sets[exId][i];
+  uhrWeg();
+  if (!satz) return;
+  satz.reps = wert;
+  satz.done = true;
+  if (!S.active.startedAt) { save(); startNow(false); startRest(exId); return; }
+  save(); buzz(13);
+  render();
+  startRest(exId);
 }
 
 /* ================================================================== tabs */
@@ -4308,6 +4428,54 @@ function exOptsSheet(exId){
 }
 
 const SKIP_REASONS = ["Gerät belegt","Gerät fehlt","Schmerzen","Keine Zeit","Bewusst weggelassen"];
+/* Gruende fuer eine Uebung, die begonnen und nicht zu Ende gebracht wurde.
+   Enger als die Liste oben: wer schon angefangen hat, hat das Geraet. */
+const ABBRUCH_GRUENDE = ["Schmerzen","Kraft am Ende","Keine Zeit","Bewusst so"];
+
+/* Uebungen, bei denen Saetze stehen geblieben sind. Nicht angefangene zaehlen
+   nicht dazu — die sind nicht abgebrochen, sondern gar nicht erst passiert,
+   und dafuer gibt es die Nachhol-Liste. */
+function angefangenOffen(){
+  const a = S.active;
+  if (!a) return [];
+  return activeExList().filter(e => {
+    if ((a.skipped || {})[e.id]) return false;
+    const rows = a.sets[e.id] || [];
+    const fertig = rows.filter(x => x.done).length;
+    return fertig > 0 && fertig < rows.length;
+  }).map(e => {
+    const rows = a.sets[e.id];
+    return {id:e.id, fertig:rows.filter(x => x.done).length, gesamt:rows.length};
+  });
+}
+
+/* Vor dem Abschliessen einmal nachfragen — aber nur, wenn es etwas zu fragen
+   gibt. Ohne diesen Grund steht im Verlauf spaeter nur ein Einbruch, und ein
+   halbes Jahr weiter weiss niemand mehr, ob die Schulter weh tat oder die Zeit
+   fehlte. */
+function abschlussPruefen(){
+  if (!angefangenOffen().length) { finishSession(); return; }
+  abschlussSheet();
+}
+
+function abschlussSheet(){
+  const offen = angefangenOffen();
+  if (!offen.length) { closeSheet(); finishSession(); return; }
+  const gr = (S.active.abbruch || {});
+  openSheet('<h3>Nicht alles geschafft</h3>'
+    + '<div class="sh-sub">Bei '+(offen.length === 1 ? 'einer Übung' : offen.length+' Übungen')
+    + ' sind Sätze offen geblieben. Der Grund hilft dir beim nächsten Mal — '
+    + 'die App liest ihn mit, bevor sie mehr Gewicht vorschlägt.</div>'
+    + offen.map(o =>
+        '<div class="frow"><div class="fq">'+esc(exName(o.id))
+        + ' <span class="faint">'+o.fertig+' von '+o.gesamt+' Sätzen</span></div>'
+        + '<div class="chips umbruch" style="margin:0">'
+        + ABBRUCH_GRUENDE.map(r => '<button class="chip'+(gr[o.id] === r ? " on" : "")+'"'
+            + ' data-a="abbruchdo" data-id="'+o.id+'" data-r="'+esc(r)+'">'+r+'</button>').join("")
+        + '</div></div>').join("")
+    + '<button class="btn" style="margin-top:18px" data-a="abbruchok">Einheit abschließen</button>'
+    + '<button class="btn ghost" data-a="sheetclose">Zurück zum Training</button>', {});
+}
 function skipSheet(exId){
   openSheet('<h3>'+esc(exName(exId))+' fällt aus</h3>'
     + '<div class="sh-sub">Die Übung landet in der Nachhol-Liste und taucht auf der Heute-Seite wieder auf.</div>'
@@ -4634,6 +4802,7 @@ function finishSession(){
          weil erst er die Wiederholungen einordnet — und weil der Vorschlag
          beim naechsten Mal genau daraus liest. */
       rir:(a.rir || {})[e.id],
+      abbruch:(a.abbruch || {})[e.id] || null,
       skipped:sk ? {reason:sk.reason} : null,
       reps:sk ? [] : (a.sets[e.id]||[]).filter(s => s.done).map(s => s.reps)
     };
@@ -4939,6 +5108,9 @@ document.addEventListener("click", ev => {
   }
   /* Loest die Nachfrage von iOS aus. Die Antwort kommt nicht hier zurueck,
      sondern spaeter ueber `training:health` — dort baut sich das Blatt neu auf. */
+  if (a === "uhr") { buzz(14); uhrSheet(id, i); return; }
+  if (a === "uhrstop") { buzz(45); uhrStop(); return; }
+  if (a === "uhrweg") { buzz(); uhrWeg(); return; }
   if (a === "vorok") {
     buzz(13);
     S.active.weights[id] = +d;
@@ -5193,7 +5365,16 @@ document.addEventListener("click", ev => {
     updateCount(); return;
   }
   if (a === "skiprest") { S.rest = null; save(); renderRest(); return; }
-  if (a === "finish") { finishSession(); return; }
+  if (a === "finish") { abschlussPruefen(); return; }
+  if (a === "abbruchdo") {
+    buzz();
+    S.active.abbruch = S.active.abbruch || {};
+    /* Nochmal derselbe Grund hebt ihn wieder auf — sonst kommt man aus einer
+       versehentlichen Angabe nicht mehr heraus. */
+    S.active.abbruch[id] = S.active.abbruch[id] === el.dataset.r ? null : el.dataset.r;
+    save(); abschlussSheet(); return;
+  }
+  if (a === "abbruchok") { closeSheet(); finishSession(); return; }
   if (a === "cancel") {
     if (confirm("Training verwerfen? Die Sätze gehen verloren.")) {
       S.active = null; S.rest = null; keepAwake(false); save(); route = null; render(); toTop();
