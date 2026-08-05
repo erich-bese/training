@@ -468,6 +468,32 @@
     transition:color .3s, background .3s, border-color .3s;
   }
   .repcount.on{color:var(--amber); background:var(--on-bg); border-color:var(--on-line)}
+  /* Vorschlag fuers Gewicht, direkt unter dem Steller. Antippbar, solange er
+     noch nicht uebernommen ist — danach nur noch eine ruhige Feststellung. */
+  .vor{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    padding:10px 12px; margin:-4px 0 12px; border-radius:12px;
+    font-size:12px; line-height:1.45; border:1px solid var(--line);
+    background:rgba(255,255,255,.03); color:var(--muted);
+  }
+  .vor b{color:var(--bone); font-weight:640}
+  .vor span:first-child{flex:1; min-width:0}
+  .vor.hoch{border-color:var(--on-line); background:var(--on-bg)}
+  .vor.hoch b{color:var(--amber)}
+  .vor.runter b{color:#E0A79B}
+  .vor.an{background:transparent; border-style:dashed}
+  .vor.halten{background:transparent; border:none; padding-left:0; padding-right:0}
+  .vor:active{transform:scale(.99)}
+  .vortag{
+    flex-shrink:0; font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--amber); font-weight:640;
+  }
+
+  /* Wie nah der letzte Satz am Limit war. Steht am Ende der Uebung, weil sie
+     dort beantwortet wird und nicht vorher. */
+  .rirrow{margin-top:13px; padding-top:13px; border-top:1px solid var(--line)}
+  .rirrow .note{margin-bottom:9px}
+
   /* Zeile "Letztes Mal" im Training. Frueher hiess sie .ghost und kollidierte
      damit mit den Ghost-Buttons: die erbten display:flex, 11,5px Schrift und
      falsches Padding quer durch die App. */
@@ -939,7 +965,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "8.9";
+const APP_VERSION = "9.0";
 
 /* ================================================================== icons */
 const I = {
@@ -1789,8 +1815,13 @@ function evaluate(plan, entries, weights){
       return;
     }
     if (e.reps.length >= cfg.sets && e.reps.every(r => r >= cfg.max)) {
-      next[cfg.id] = snapTo(w + inc, inc);
-      changes.push({id:cfg.id, from:w, to:next[cfg.id], why:"alle Sätze im Ziel"});
+      /* War der letzte Satz locker, war das Gewicht zwei Stufen zu leicht.
+         Dieselbe Regel wie im Vorschlag vor der Einheit — sonst empfaehle die
+         App etwas anderes, als sie danach rechnet. */
+      const stufen = e.rir >= 3 ? 2 : 1;
+      next[cfg.id] = snapTo(w + stufen * inc, inc);
+      changes.push({id:cfg.id, from:w, to:next[cfg.id],
+                    why:"alle Sätze im Ziel" + (stufen > 1 ? ", noch Luft" : "")});
       return;
     }
     const past = S.sessions.filter(s => s.entries.some(x => x.id === cfg.id && x.reps.length))
@@ -1805,6 +1836,58 @@ function evaluate(plan, entries, weights){
     }
   });
   return {next:next, changes:changes};
+}
+
+/* -------------------------------------------------- Vorschlag fuers Gewicht */
+/* Dieselbe Regel, die nach der Einheit rechnet — nur vorher gefragt. Bisher
+   entschied sie im Stillen; man sah beim Training nur das alte Gewicht und
+   musste selbst raten, ob es diesmal mehr sein darf.
+
+   `rir` ist der Abstand zum Muskelversagen aus der letzten Einheit: 0 heisst
+   nichts mehr ging, 3 heisst es war locker. Nur damit laesst sich "alle Saetze
+   im Ziel" ueberhaupt einordnen — zehn Wiederholungen mit drei in Reserve sind
+   etwas anderes als zehn am Limit. */
+function gewichtVorschlag(exId, planId){
+  const pl = planOf(planId || (S.active && S.active.plan));
+  const cfg = pl && (pl.ex || []).find(x => x.id === exId);
+  const le = lastEntry(exId);
+  if (!cfg || !le) return null;
+
+  const w = le.entry.weight || 0;
+  const inc = incOf(exId);
+  const reps = le.entry.reps;
+  const rir = le.entry.rir;
+  const summe = reps.reduce((a,b) => a+b, 0);
+
+  /* Ein Wechsel der Zaehlweise macht die letzte Einheit unvergleichbar: 20 kg
+     je Seite sind nicht 20 kg gesamt. Dann lieber nichts sagen. */
+  const jetzt = (S.active && S.active.cfg[exId]) || cfgOf(exId);
+  if (!!jetzt.perSide !== !!le.entry.perSide || (jetzt.ecc || 0) !== (le.entry.ecc || 0)) return null;
+
+  const oben = cfg.total ? summe >= cfg.total[1]
+             : (reps.length >= cfg.sets && reps.every(r => r >= cfg.max));
+
+  if (oben) {
+    /* War auch der letzte Satz locker, war das Gewicht zwei Stufen zu leicht.
+       Ohne Angabe bleibt es bei einer — raten waere hier teuer. */
+    const stufen = rir >= 3 ? 2 : 1;
+    return {von:w, auf:snapTo(w + stufen * inc, inc), art:"hoch",
+            warum: cfg.total ? summe + " Wdh. gesamt geschafft" : "alle Sätze im Ziel",
+            dazu: rir >= 3 ? "und noch Luft" : rir === 0 ? "aber nichts mehr übrig" : ""};
+  }
+
+  const frueher = S.sessions.filter(s => s.entries.some(x => x.id === exId && x.reps.length))
+    .slice(-3).map(s => s.entries.find(x => x.id === exId));
+  const schwach = frueher.filter(x => x.reps.length && !cfg.total &&
+    x.reps.reduce((a,b) => a+b, 0) / x.reps.length < cfg.min);
+  if (schwach.length >= 3 && w > 0) {
+    return {von:w, auf:snapTo(w * 0.9, inc), art:"runter", warum:"dreimal unter dem Ziel", dazu:""};
+  }
+
+  const fehlt = cfg.total ? (cfg.total[1] - summe) + " Wdh. bis zum Ziel"
+              : "noch nicht alle Sätze bei " + cfg.max;
+  return {von:w, auf:w, art:"halten", warum:fehlt,
+          dazu: rir === 0 ? "und nichts mehr übrig" : ""};
 }
 
 /* Ohne feste Trainingstage kann die Serie keine Pflichttage mehr zaehlen.
@@ -3583,8 +3666,10 @@ function viewSession(){
       + '<span class="note">'+(isBw(e.id) ? 'Zusatzgewicht' : c.perSide ? 'pro Seite' : 'Gewicht')+'</span>'
       + stepper("weight", e.id, a.weights[e.id], incOf(e.id), (isBw(e.id) && a.weights[e.id] === 0) ? "" : "kg")
       + '</div>'
+      + vorschlagZeile(e.id, a.weights[e.id])
       + '<div data-sets="'+e.id+'">' + rows.map((s,i) => setRow(e, s, i)).join("") + '</div>'
       + '<button class="addset" data-a="addset" data-id="'+e.id+'">+ Satz</button>'
+      + rirZeile(e.id, rows)
       /* Die Historie haengt an der Uebung, nicht am Plan: Klimmzuege sind in
          Pull Kraft und Pull Volumen dieselbe Uebung. Deshalb muss dastehen, aus
          welcher Einheit die Zahlen stammen — sonst wirkt es widerspruechlich,
@@ -3614,6 +3699,42 @@ function setRow(e, s, i){
     + '<div class="reps num">'+s.reps+(istZeit(e.id) ? '<small>s</small>' : '')+'</div>'
     + '<button class="rb xs" data-a="reps" data-id="'+e.id+'" data-i="'+i+'" data-d="'+schrittVon(e.id)+'">'+I.plus+'</button></div>'
     + '<button class="rb'+(s.done?" on":"")+'" data-a="log" data-id="'+e.id+'" data-i="'+i+'">'+I.check+'</button></div>';
+}
+
+/* Der Vorschlag steht direkt unter dem Gewicht — dort, wo die Frage entsteht.
+   Steht das Gewicht schon auf dem Vorschlag, verschwindet die Zeile: eine
+   Empfehlung, die man bereits befolgt hat, ist nur noch Rauschen. */
+function vorschlagZeile(exId, aktuell){
+  const v = gewichtVorschlag(exId);
+  if (!v) return "";
+  if (v.art === "halten") {
+    return '<div class="vor halten"><span>' + esc(v.warum)
+      + (v.dazu ? ' ' + esc(v.dazu) : '') + ' — Gewicht halten</span></div>';
+  }
+  if (Math.abs((aktuell || 0) - v.auf) < 0.001) {
+    return '<div class="vor an"><span>' + kg(v.auf) + ' kg übernommen · ' + esc(v.warum) + '</span></div>';
+  }
+  return '<button class="vor ' + v.art + '" data-a="vorok" data-id="' + exId + '" data-d="' + v.auf + '">'
+    + '<span><b>' + (v.art === "hoch" ? "Vorschlag " : "Zurück auf ") + kg(v.auf) + ' kg</b> · '
+    + esc(v.warum) + (v.dazu ? ' ' + esc(v.dazu) : '') + '</span>'
+    + '<span class="vortag">Übernehmen</span></button>';
+}
+
+/* Wie nah der letzte Satz am Muskelversagen war. Eine Frage je Uebung, nicht
+   je Satz — je Satz wuerde niemand ausfuellen, und der letzte Satz traegt die
+   Aussage ohnehin. Sie erscheint erst, wenn die Uebung durch ist. */
+const RIR_STUFEN = [[3,"Locker"],[2,"1–2 übrig"],[0,"Am Limit"]];
+function rirZeile(exId, rows){
+  if (!S.active) return "";
+  const fertig = rows.length && rows.every(s => s.done);
+  if (!fertig) return "";
+  const cur = (S.active.rir || {})[exId];
+  /* Beschriftung ueber den Knoepfen, nicht daneben: nebeneinander brach
+     "1–2 übrig" auf zwei Zeilen und die drei Felder wurden ungleich hoch. */
+  return '<div class="rirrow"><div class="note">Wie war der letzte Satz?</div>'
+    + '<div class="seg">' + RIR_STUFEN.map(o =>
+        '<button data-a="rir" data-id="'+exId+'" data-d="'+o[0]+'" class="'+(cur === o[0] ? "on" : "")+'">'
+        + o[1] + '</button>').join("") + '</div></div>';
 }
 
 /* ================================================================== tabs */
@@ -4416,6 +4537,10 @@ function finishSession(){
       id:e.id, name:exName(e.id), bw:isBw(e.id),
       weight:a.weights[e.id], perSide:!!c.perSide, ecc:+c.ecc||0, chain:+c.chain||0,
       variant:c.variant || "", note:"",
+      /* Abstand zum Muskelversagen im letzten Satz. Wandert mit in den Verlauf,
+         weil erst er die Wiederholungen einordnet — und weil der Vorschlag
+         beim naechsten Mal genau daraus liest. */
+      rir:(a.rir || {})[e.id],
       skipped:sk ? {reason:sk.reason} : null,
       reps:sk ? [] : (a.sets[e.id]||[]).filter(s => s.done).map(s => s.reps)
     };
@@ -4721,6 +4846,23 @@ document.addEventListener("click", ev => {
   }
   /* Loest die Nachfrage von iOS aus. Die Antwort kommt nicht hier zurueck,
      sondern spaeter ueber `training:health` — dort baut sich das Blatt neu auf. */
+  if (a === "vorok") {
+    buzz(13);
+    S.active.weights[id] = +d;
+    save(); render(); return;
+  }
+  if (a === "rir") {
+    buzz();
+    S.active.rir = S.active.rir || {};
+    S.active.rir[id] = +d;
+    save();
+    /* Nur die eine Zeile neu setzen: ein Neuaufbau waehrend der Einheit
+       kostet Scrollstand und Eingabefokus. */
+    const zeile = document.querySelector('[data-a="rir"][data-id="'+id+'"]');
+    if (zeile) zeile.parentNode.querySelectorAll("button").forEach(b =>
+      b.classList.toggle("on", +b.getAttribute("data-d") === +d));
+    return;
+  }
   if (a === "startnow") { buzz(14); unlockAudio(); startNow(); return; }
   if (a === "warmup") { buzz(13); unlockAudio(); startWarmup(); return; }
   if (a === "sysinfo") { buzz(); sysSheet(); return; }
