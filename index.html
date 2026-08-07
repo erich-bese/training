@@ -566,16 +566,28 @@
      null hoch und damit unsichtbar. */
   #topfade{
     position:fixed; left:0; right:0; top:0; z-index:30; pointer-events:none;
-    height:calc(env(safe-area-inset-top) + 14px);
-    /* Deckend bis genau zur Statusleiste, erst darunter der weiche Auslauf.
-       Vorher war der Verlauf schon auf halber Hoehe der Insel durchsichtig —
-       in der installierten App scrollten dadurch Saetze neben der Dynamic
-       Island vorbei, und die Kopfzeile darunter sah abgeschnitten aus.
-       Die einfarbige Angabe steht davor als Rueckfall, falls env() in einem
-       Farbverlauf nicht unterstuetzt wird. */
-    background:var(--bg);
+    height:calc(env(safe-area-inset-top) + 16px);
+    /* Nicht deckend, sondern milchig: der warme Schimmer der Seite laeuft
+       dadurch bis unter die Dynamic Island durch, statt an einer sichtbaren
+       Kante abzureissen. Der Inhalt darunter verschwimmt beim Scrollen —
+       das ist der Grund, warum der Streifen ueberhaupt existiert, und es
+       sieht besser aus als ein hartes Abschneiden.
+       Die Maske laesst die Unschaerfe nach unten auslaufen; ohne sie haette
+       der Streifen selbst wieder eine Kante.
+       Der deckende Verlauf steht davor als Rueckfall fuer Browser ohne
+       backdrop-filter — dort bleibt es beim bisherigen Verhalten. */
     background:linear-gradient(to bottom,
       var(--bg) 0, var(--bg) env(safe-area-inset-top), rgba(8,9,10,0) 100%);
+  }
+  @supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)) {
+    #topfade{
+      background:linear-gradient(to bottom,
+        rgba(8,9,10,.62) 0, rgba(8,9,10,.42) 70%, rgba(8,9,10,0) 100%);
+      backdrop-filter:blur(16px) saturate(1.1);
+      -webkit-backdrop-filter:blur(16px) saturate(1.1);
+      -webkit-mask-image:linear-gradient(to bottom, #000 68%, transparent);
+      mask-image:linear-gradient(to bottom, #000 68%, transparent);
+    }
   }
 
   /* Kompakte Muskelkarte fuer die Startseite: dort zaehlt der schnelle Blick,
@@ -1022,7 +1034,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.3";
+const APP_VERSION = "9.4";
 
 /* ================================================================== icons */
 const I = {
