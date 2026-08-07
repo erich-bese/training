@@ -9,3 +9,6 @@ ios/Training/web/
 ios/build/
 ios/Training.xcodeproj/xcuserdata/
 ios/Training.xcodeproj/project.xcworkspace/
+
+# iOS: lokale Kennungen fuer den Upload, gehoeren nicht ins oeffentliche Repo
+ios/.env

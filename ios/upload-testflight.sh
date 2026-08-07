@@ -8,15 +8,30 @@
 #   2. App-Eintrag in App Store Connect mit der Bundle-ID de.besemedia.training
 #   3. App-Store-Connect-API-Schlüssel:
 #      App Store Connect → Users and Access → Integrations → App Store Connect API
-#      → Schlüssel erzeugen, Rolle "App Manager", .p8-Datei herunterladen.
+#      → Schlüssel erzeugen, Rolle "Admin", .p8-Datei herunterladen.
+#      "App Manager" reicht nicht: damit darf Apple keine Verteilungsprofile
+#      anlegen, und der Export scheitert mit "Cloud signing permission error".
 #      Die Datei gibt es nur ein einziges Mal zum Herunterladen.
 #      Ablegen unter ~/.appstoreconnect/private_keys/AuthKey_<KEYID>.p8
 #
-# Aufruf:
+# Aufruf, wenn ios/.env gepflegt ist:
+#   ./upload-testflight.sh
+# Sonst:
 #   ASC_KEY_ID=XXXXXXXXXX ASC_ISSUER_ID=xxxxxxxx-xxxx-... ./upload-testflight.sh
 set -e
 
 here=$(cd "$(dirname "$0")" && pwd)
+
+# Kennungen aus einer lokalen Datei, falls vorhanden. Sie liegt ausserhalb des
+# Repos, weil das Repo oeffentlich ist — und erspart es, bei jedem Aufruf drei
+# Kennungen von Hand mitzugeben. Was schon in der Umgebung steht, gewinnt.
+if [ -f "$here/.env" ]; then
+  while IFS='=' read -r name wert; do
+    case "$name" in ''|\#*) continue ;; esac
+    eval "current=\${$name:-}"
+    [ -z "$current" ] && export "$name=$wert"
+  done < "$here/.env"
+fi
 
 # Team-ID aus der Umgebung, sonst aus dem Entwicklerzertifikat im Schluesselbund.
 team=${DEVELOPMENT_TEAM:-}
