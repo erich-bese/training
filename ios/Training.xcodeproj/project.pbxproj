@@ -363,7 +363,7 @@
 				CODE_SIGN_ENTITLEMENTS = Training/Training.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = TB3C8PZPY7;
 				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Training/Info.plist;
@@ -386,7 +386,7 @@
 				CODE_SIGN_ENTITLEMENTS = Training/Training.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = TB3C8PZPY7;
 				ENABLE_PREVIEWS = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Training/Info.plist;
@@ -407,7 +407,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = TB3C8PZPY7;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = TrainingLive/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Training;
@@ -431,7 +431,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = TB3C8PZPY7;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = TrainingLive/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Training;
