@@ -20,6 +20,13 @@
 #   ASC_KEY_ID=XXXXXXXXXX ASC_ISSUER_ID=xxxxxxxx-xxxx-... ./upload-testflight.sh
 set -e
 
+# Das Skript kennt keine Argumente. Sie stillschweigend zu ignorieren waere
+# teuer: ein vermeintlicher Probelauf wuerde einen echten Build hochladen.
+if [ $# -gt 0 ]; then
+  echo "Dieses Skript nimmt keine Argumente. Jeder Aufruf laedt wirklich hoch."
+  exit 2
+fi
+
 here=$(cd "$(dirname "$0")" && pwd)
 
 # Kennungen aus einer lokalen Datei, falls vorhanden. Sie liegt ausserhalb des
