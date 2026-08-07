@@ -13,6 +13,9 @@ final class Bridge: NSObject, WKScriptMessageHandler {
     static let handlerName = "native"
 
     private weak var webView: WKWebView?
+    /// Set by the shell. Reloads the page *and* rebuilds the injected seed —
+    /// see `WebShell.reloadPage()` for why that matters.
+    var reload: (() -> Void)?
     private let store: Store
     private let updater: WebUpdater
 
@@ -177,7 +180,11 @@ final class Bridge: NSObject, WKScriptMessageHandler {
             case .updated(let version):
                 self.report("Version \(version) geladen. Starte neu …")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                    self.webView?.reloadFromOrigin()
+                    /* Nicht `reloadFromOrigin()`: das Startskript traegt den
+                       Datenstand vom App-Start eingebacken und wuerde ihn
+                       erneut einspielen. `reloadPage()` sichert vorher und
+                       baut das Skript neu auf. */
+                    self.reload?()
                 }
             case .failed(let reason):
                 self.report("Prüfung fehlgeschlagen: \(reason)")

@@ -564,30 +564,13 @@
      Scrollen unter Uhrzeit und Dynamic Island durch, statt hart an ihnen
      abzuschneiden. Ohne Statusleiste — also im Browser — ist der Streifen
      null hoch und damit unsichtbar. */
-  #topfade{
-    position:fixed; left:0; right:0; top:0; z-index:30; pointer-events:none;
-    height:calc(env(safe-area-inset-top) + 16px);
-    /* Nicht deckend, sondern milchig: der warme Schimmer der Seite laeuft
-       dadurch bis unter die Dynamic Island durch, statt an einer sichtbaren
-       Kante abzureissen. Der Inhalt darunter verschwimmt beim Scrollen —
-       das ist der Grund, warum der Streifen ueberhaupt existiert, und es
-       sieht besser aus als ein hartes Abschneiden.
-       Die Maske laesst die Unschaerfe nach unten auslaufen; ohne sie haette
-       der Streifen selbst wieder eine Kante.
-       Der deckende Verlauf steht davor als Rueckfall fuer Browser ohne
-       backdrop-filter — dort bleibt es beim bisherigen Verhalten. */
-    background:linear-gradient(to bottom,
-      var(--bg) 0, var(--bg) env(safe-area-inset-top), rgba(8,9,10,0) 100%);
-  }
-  @supports (backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px)) {
-    #topfade{
-      background:linear-gradient(to bottom,
-        rgba(8,9,10,.62) 0, rgba(8,9,10,.42) 70%, rgba(8,9,10,0) 100%);
-      backdrop-filter:blur(16px) saturate(1.1);
-      -webkit-backdrop-filter:blur(16px) saturate(1.1);
-      -webkit-mask-image:linear-gradient(to bottom, #000 68%, transparent);
-      mask-image:linear-gradient(to bottom, #000 68%, transparent);
-    }
+  /* Kein Streifen mehr ueber der Statusleiste. Der Inhalt laeuft durch, so wie
+     in den Apps, an denen er sich orientiert — der Hintergrund reicht ohnehin
+     schon unter die Dynamic Island, und ein Schleier darueber sah aus wie eine
+     Kante, die dort nicht hingehoert.
+     Der Preis: beim Scrollen zieht Inhalt sichtbar an der Insel vorbei. Das ist
+     bewusst so gewaehlt. Die klebende Kopfzeile im Training bleibt davon
+     unberuehrt — sie setzt weiterhin unter der Statusleiste auf. */
   }
 
   /* Kompakte Muskelkarte fuer die Startseite: dort zaehlt der schnelle Blick,
@@ -1024,7 +1007,6 @@
 <body>
 <div id="bg"></div>
 <div id="scroll"><div id="app"></div></div>
-<div id="topfade"></div>
 <div id="tabs"></div>
 <div id="rest"></div>
 <div id="sheet"></div>
@@ -1034,7 +1016,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.4";
+const APP_VERSION = "9.5";
 
 /* ================================================================== icons */
 const I = {

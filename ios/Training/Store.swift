@@ -71,7 +71,20 @@ final class Store {
                 return
             }
             // Unchanged content is the common case — the page flushes on a timer.
-            if let old = try? Data(contentsOf: stateURL), old == data { return }
+            let old = try? Data(contentsOf: stateURL)
+            if let old, old == data { return }
+
+            // Ein Riegel gegen genau den Fall, der einmal passiert ist: die
+            // Seite meldet einen leeren Speicher, waehrend hier ein voller
+            // liegt. Leer ist nie eine gueltige Meldung — selbst ein
+            // Zuruecksetzen in der App hinterlaesst den Schluessel mit einem
+            // leeren Datenmodell darin, nicht ein leeres Woerterbuch. Was
+            // dahintersteckt, gehoert behoben; ueberschrieben werden darf
+            // deswegen trotzdem nichts.
+            if items.isEmpty, let old, !old.isEmpty, old.count > 2 {
+                Log.warn("store: leere Meldung verworfen, \(old.count) Byte auf der Platte bleiben stehen")
+                return
+            }
 
             rotate()
             do {

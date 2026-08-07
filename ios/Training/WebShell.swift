@@ -63,6 +63,29 @@ final class WebShell: UIViewController {
 
     // MARK: - Setup
 
+    /// Reloads the page with a freshly seeded bridge.
+    ///
+    /// The seed is baked into the user script as a literal — it has to be, the
+    /// page reads its data on the first line of its own script and cannot wait
+    /// for a round trip. But a user script survives a reload unchanged, so a
+    /// plain `reloadFromOrigin()` re-injects the data as it was when the app
+    /// started. Everything logged since then would be silently replaced by the
+    /// old copy, and the page's next save would write that over the real file.
+    ///
+    /// That is exactly what happened once: app started empty, a backup was
+    /// imported, the update check reloaded — and the imported training data was
+    /// gone. Hence: flush first, rebuild the script from what is now on disk,
+    /// only then reload.
+    func reloadPage() {
+        flush { [weak self] in
+            guard let self, let content = self.webView?.configuration.userContentController else { return }
+            content.removeAllUserScripts()
+            content.addUserScript(Bridge.userScript(seededWith: self.store.read(),
+                                                    version: Self.shellVersion))
+            self.webView?.reloadFromOrigin()
+        }
+    }
+
     private func buildWebView() {
         let content = WKUserContentController()
         // Seeded synchronously: the page reads its data on the first line of
@@ -93,6 +116,7 @@ final class WebShell: UIViewController {
         if #available(iOS 16.4, *) { webView.isInspectable = true }
 
         bridge.attach(to: webView)
+        bridge.reload = { [weak self] in self?.reloadPage() }
         view.addSubview(webView)
 
         // Full bleed on all four edges — the background reaches under the
