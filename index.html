@@ -701,18 +701,39 @@
   .sesshead::before{
     content:""; position:absolute; z-index:-1; pointer-events:none;
     left:-26px; right:-26px;
-    /* Nur wenig nach oben. Die Flaeche mit `env(safe-area-inset-top)` bis
-       unter die Statusleiste zu ziehen ist zwar richtig, solange die Karte
-       oben klebt — im Ruhezustand liegt sie dann aber ueber der Zeile mit
-       "Abbrechen", und ein unscharfer Knopf sieht nach Fehler aus. Oberhalb
-       der Karte laeuft der Inhalt ohnehin bewusst sichtbar an der Dynamic
-       Island vorbei; hier geht es um den Uebergang darunter. */
+    /* Nur wenig nach oben. Alles oberhalb uebernimmt der feste Streifen in
+       `::after` — mitscrollend nach oben zu greifen faellt im Ruhezustand
+       ueber die Zeile mit "Abbrechen", und ein unscharfer Knopf sieht nach
+       Fehler aus. Die zehn Pixel sind die Ueberlappung, damit zwischen
+       beiden Flaechen keine scharfe Naht steht. */
     top:-10px;
     bottom:-54px;
     -webkit-backdrop-filter:blur(26px) saturate(115%);
     backdrop-filter:blur(26px) saturate(115%);
     -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 60px), transparent 100%);
     mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 60px), transparent 100%);
+  }
+  /* Der Streifen in Hoehe der Dynamic Island.
+     Er haengt am Bildschirm, nicht am Inhalt — deshalb `fixed`. Genau das
+     loest den Widerspruch: die Flaeche oben muss immer da sein, waehrend die
+     mitscrollende Flaeche der Karte im Ruhezustand nicht ueber die Zeile mit
+     "Abbrechen" greifen darf.
+
+     Hoehe ist die Statusleiste plus die acht Pixel Abstand bis zur Karte, so
+     dass er unten genau dort endet, wo die Karte im geklebten Zustand
+     anfaengt — und sich mit deren Flaeche ueberlappt. Ohne ihn zog der Inhalt
+     gestochen scharf an der Insel vorbei und lief dann in den Weichzeichner,
+     was aussah wie ein halb gerendertes Bild.
+
+     Im Ruhezustand blendet er nichts weich, weil dort nur der Seitenrand
+     liegt; im Browser ist `env(safe-area-inset-top)` null und er schrumpft
+     auf die acht Pixel zusammen. */
+  .sesshead::after{
+    content:""; position:fixed; z-index:-1; pointer-events:none;
+    left:0; right:0; top:0;
+    height:calc(env(safe-area-inset-top) + 8px);
+    -webkit-backdrop-filter:blur(26px) saturate(115%);
+    backdrop-filter:blur(26px) saturate(115%);
   }
   /* Die Karte ist das, was schwebt: deckend, mit hellerer Kante und einem
      Schatten, der tiefer greift als bei den ruhenden Karten. Ohne den
@@ -1266,6 +1287,12 @@
   .anim>*:nth-child(5){animation-delay:.21s}
   .anim>*:nth-child(6){animation-delay:.25s}
   .anim>*:nth-child(n+7){animation-delay:.29s}
+  /* Die klebende Kopfzeile faehrt nicht mit ein. Waehrend der Animation
+     traegt sie eine Transformation, und ein `fixed` Kindelement richtet sich
+     dann an ihr aus statt am Bildschirm — der Weichzeichner an der Insel
+     saesse eine halbe Sekunde lang falsch. Sie soll ohnehin stehen und nicht
+     auffahren: sie ist der feste Punkt der Ansicht. */
+  .anim>.sesshead{animation:none}
 
   /* Alles Antippbare federt. Ohne das fuehlt sich eine Web-Oberflaeche in
      einer App sofort fremd an — native Bedienelemente antworten immer. */
@@ -1286,7 +1313,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.25";
+const APP_VERSION = "9.26";
 
 /* ================================================================== icons */
 const I = {
