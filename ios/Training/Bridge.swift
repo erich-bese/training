@@ -110,6 +110,14 @@ final class Bridge: NSObject, WKScriptMessageHandler {
         case "sound":
             Toene.spiel(body["art"] as? String ?? "ende")
 
+        /* Nicht der Ton, sondern der Zeitpunkt. Die Zeitgeber der Webansicht
+           stehen still, sobald die App nicht mehr vorn ist — und genau dann
+           laeuft die Pause. Die Huelle stellt sich den Wecker selbst; 0 sagt
+           ihn wieder ab. Begruendung ausfuehrlich in `Pausenwecker`. */
+        case "pause":
+            let ms = body["endsAt"] as? Double ?? 0
+            Pausenwecker.shared.planen(bis: ms > 0 ? Date(timeIntervalSince1970: ms / 1000) : nil)
+
         case "awake":
             let on = body["on"] as? Bool ?? false
             Bridge.awakeGewuenscht = on

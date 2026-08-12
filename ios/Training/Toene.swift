@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import UserNotifications
 
 /// The sounds of a session, generated rather than shipped as files.
 ///
@@ -29,6 +30,15 @@ enum Toene {
     ]
 
     private static var spieler: AVAudioPlayer?
+
+    /// A buffer of pure silence.
+    ///
+    /// Not a sound but a lever: an app that is playing audio is not suspended,
+    /// and only an app that is not suspended can beep at a moment it chose
+    /// earlier. See `Pausenwecker`.
+    static func stille(_ sekunden: Double) -> Data? {
+        wav([(frequenz: 0, dauer: sekunden, lautstaerke: 0)])
+    }
 
     static func spiel(_ art: String) {
         guard let rezept = rezepte[art] ?? rezepte["ende"] else { return }
@@ -89,5 +99,137 @@ enum Toene {
         str("data"); u32(UInt32(datenLaenge))
         proben.forEach { u16(UInt16(bitPattern: $0)) }
         return d
+    }
+}
+
+/// The rest timer's alarm — the one sound that has to arrive while nobody is
+/// looking at the screen.
+///
+/// During a rest the phone lies on the bench or in a pocket. That is exactly
+/// when iOS freezes the web view's timers: the page's own per-second tick stops
+/// and its beep only happened once the app was brought back to the front, long
+/// after the rest was over. No amount of work inside the page fixes this —
+/// Web Audio, the audio session category and the visibility rules are all
+/// downstream of the app being suspended in the first place.
+///
+/// So the page stops asking for a sound and hands over a *point in time*
+/// instead. Two independent things then have to go wrong for the alarm to be
+/// missed:
+///
+/// 1. **Audio.** A looping buffer of silence keeps the audio session running,
+///    and an app that plays audio is not suspended. A timer can therefore fire
+///    in the background and play the real tone through the `.playback` session
+///    — audible with the ring switch on silent, which is where his phone
+///    always is. The silence stops the moment the tone has played; nothing
+///    keeps running between sessions.
+/// 2. **A local notification** at the same moment. It costs nothing, survives
+///    even an app the system did kill, and on a silenced phone it is the
+///    vibration in the pocket. Suppressed while the app is frontmost, because
+///    there the tone has already been heard.
+final class Pausenwecker: NSObject, UNUserNotificationCenterDelegate {
+
+    static let shared = Pausenwecker()
+
+    private var wecker: Timer?
+    private var stille: AVAudioPlayer?
+    private var gefragt = false
+
+    private static let kennung = "pause"
+
+    /// Called from the page every time a rest starts, is skipped, or the
+    /// session ends. A date in the past — or `nil` — cancels.
+    func planen(bis ende: Date?) {
+        absagen()
+        guard let ende else { return }
+        let rest = ende.timeIntervalSinceNow
+        /* Schon vorbei: dann ist der Ton faellig, nicht der Wecker. Das
+           passiert, wenn die Seite nach einem Neuladen nachtraegt. */
+        guard rest > 0.4 else { return }
+
+        wachHalten()
+        let t = Timer(timeInterval: rest, repeats: false) { [weak self] _ in
+            Toene.spiel("ende")
+            /* Der Ton ist raus — ab hier gibt es keinen Grund mehr, die App
+               wach zu halten. Weiterlaufende Stille waere nur Batterie. */
+            self?.stilleBeenden()
+            self?.wecker = nil
+        }
+        /* `.common`, damit er auch waehrend einer Scroll-Geste feuert. */
+        RunLoop.main.add(t, forMode: .common)
+        wecker = t
+
+        melden(zu: ende)
+    }
+
+    func absagen() {
+        wecker?.invalidate()
+        wecker = nil
+        stilleBeenden()
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [Self.kennung])
+    }
+
+    // MARK: - Wachbleiben
+
+    private func wachHalten() {
+        guard stille == nil else { return }
+        /* Eine Sekunde reicht: der Spieler wiederholt sie endlos. Ein laengerer
+           Puffer waere nur mehr Speicher fuer dieselbe Wirkung. */
+        guard let daten = Toene.stille(1.0) else { return }
+        do {
+            try? AVAudioSession.sharedInstance().setActive(true)
+            let p = try AVAudioPlayer(data: daten)
+            p.numberOfLoops = -1
+            p.volume = 0
+            p.prepareToPlay()
+            p.play()
+            stille = p
+        } catch {
+            /* Ohne Stille bleibt der Wecker trotzdem stehen — er feuert dann
+               nur, solange die App vorn ist. Die Mitteilung faengt den Rest. */
+            Log.warn("pause: silence player failed — \(error.localizedDescription)")
+        }
+    }
+
+    private func stilleBeenden() {
+        stille?.stop()
+        stille = nil
+    }
+
+    // MARK: - Mitteilung
+
+    private func melden(zu ende: Date) {
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+        let stellen = {
+            let inhalt = UNMutableNotificationContent()
+            inhalt.title = "Pause vorbei"
+            inhalt.body = "Weiter mit dem nächsten Satz."
+            inhalt.sound = .default
+            let rest = ende.timeIntervalSinceNow
+            guard rest > 0.4 else { return }
+            let ausloeser = UNTimeIntervalNotificationTrigger(timeInterval: rest, repeats: false)
+            center.add(UNNotificationRequest(identifier: Self.kennung,
+                                             content: inhalt, trigger: ausloeser))
+        }
+        /* Einmal fragen, und zwar erst hier: beim ersten Pausenende, wo der
+           Zweck offensichtlich ist. Beim Start der App waere es eine Frage
+           ohne erkennbaren Anlass. Ein Nein aendert nichts am Ton. */
+        guard gefragt else {
+            gefragt = true
+            center.requestAuthorization(options: [.alert, .sound]) { ok, _ in
+                if ok { DispatchQueue.main.async(execute: stellen) }
+            }
+            return
+        }
+        stellen()
+    }
+
+    /// Nothing to show while the app is frontmost — the tone was audible and a
+    /// banner over the running session would only be in the way.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler handler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        handler([])
     }
 }

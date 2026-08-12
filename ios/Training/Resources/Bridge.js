@@ -129,6 +129,22 @@
     post({ cmd: "sound", art: String(art || "ende") });
   };
 
+  /* Der Pausenton, wenn die App gar nicht vorn ist.
+   *
+   * Waehrend der Pause liegt das Telefon auf der Bank. Genau dann friert iOS
+   * die Zeitgeber der Webansicht ein — der Sekundentakt der Seite laeuft nicht
+   * mehr, und der Ton kam erst, wenn man die App wieder aufmachte. Aus der
+   * Seite heraus ist das nicht loesbar, egal wie der Ton erzeugt wird.
+   *
+   * Deshalb bekommt die Huelle nicht den Ton, sondern den *Zeitpunkt*: sie
+   * stellt sich selbst den Wecker und haelt sich bis dahin wach. Eine Null
+   * sagt den Wecker wieder ab — Pause abgebrochen, uebersprungen oder Einheit
+   * vorbei. Die Seite prueft auf diese Funktion; fehlt sie, bleibt es beim
+   * alten Verhalten im Browser. */
+  window.__training_pause = function (endsAt) {
+    post({ cmd: "pause", endsAt: Number(endsAt) || 0 });
+  };
+
   /* ---------------------------------------------------- health app ------- */
   /* Den Schalter fuer die HRV kann keine App selbst umlegen — genau dafuer
      gibt es die Berechtigung. Abkuerzen laesst sich nur der Weg dorthin. */

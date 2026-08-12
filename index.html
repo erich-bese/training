@@ -521,6 +521,12 @@
   .vor.hoch{border-color:var(--on-line); background:var(--on-bg)}
   .vor.hoch b{color:var(--amber)}
   .vor.runter b{color:#E0A79B}
+  /* Umgerechnet aus einem anderen Wiederholungsbereich. Eigene Farbe, weil es
+     etwas anderes ist als "steigern": es ist ein erster Anhaltspunkt, kein
+     Ergebnis aus dem Verlauf. Amber waere hier eine Behauptung. */
+  .vor.neu{border-color:rgba(127,166,201,.30); background:rgba(127,166,201,.09)}
+  .vor.neu b{color:var(--cool)}
+  .vor.neu .vortag{color:var(--cool)}
   .vor.an{background:transparent; border-style:dashed}
   .vor.halten{background:transparent; border:none; padding-left:0; padding-right:0}
   .vor:active{transform:scale(.99)}
@@ -618,6 +624,19 @@
   }
   .chip.on{background:var(--bone); color:#0A0A0B; border-color:transparent}
 
+  /* Zeitbudget vor dem Start. Eigene Klassen statt `.chips`: dort laufen die
+     Knoepfe waagerecht weg, hier sollen sie umbrechen — es sind vier, und der
+     letzte darf nicht hinter dem Rand liegen. */
+  .zbudget{margin-bottom:9px}
+  .zb-kopf{font-size:14px; font-weight:620; letter-spacing:-.02em; margin-bottom:11px}
+  .zb-chips{display:flex; flex-wrap:wrap; gap:7px}
+  .zb-info{
+    font-size:11.5px; line-height:1.5; color:var(--muted);
+    margin-top:12px; padding-top:11px; border-top:1px solid var(--line);
+  }
+  .zb-info b{color:var(--bone); font-weight:600}
+  .zb-info .faint{color:var(--faint)}
+
   /* ---- week columns ---- */
   .weeks{display:flex; align-items:flex-end; gap:7px; height:112px; position:relative}
   .weeks .col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%}
@@ -664,6 +683,36 @@
     position:sticky; top:env(safe-area-inset-top); z-index:25;
     padding-top:8px; margin:0 0 12px;
     pointer-events:none;
+  }
+  /* Der Weichzeichner rundherum. Karte und Liste lagen bisher optisch auf
+     derselben Ebene: die Karte war zwar deckend, aber alles daneben und
+     dahinter blieb scharf, und damit fehlte der Tiefenunterschied.
+
+     Weichgezeichnet wird nicht die Karte, sondern das, was hinter ihr
+     durchlaeuft. Die Flaeche traegt bewusst **keinen Farbton** und blendet
+     nach unten aus — genau daran sind die beiden frueheren Versuche
+     gescheitert: erst ein Farbverlauf, dann eine deckende Leiste, beide mit
+     einem sichtbaren Abschluss quer ueber die Seite. Unscharf allein liest
+     sich als Tiefe, nicht als Kante.
+
+     Sie greift ueber die Karte hinaus (seitlich und nach oben bis unter die
+     Statusleiste), damit die Karte in einer weichen Zone steht statt auf
+     einer Linie zu enden. */
+  .sesshead::before{
+    content:""; position:absolute; z-index:-1; pointer-events:none;
+    left:-26px; right:-26px;
+    /* Nur wenig nach oben. Die Flaeche mit `env(safe-area-inset-top)` bis
+       unter die Statusleiste zu ziehen ist zwar richtig, solange die Karte
+       oben klebt — im Ruhezustand liegt sie dann aber ueber der Zeile mit
+       "Abbrechen", und ein unscharfer Knopf sieht nach Fehler aus. Oberhalb
+       der Karte laeuft der Inhalt ohnehin bewusst sichtbar an der Dynamic
+       Island vorbei; hier geht es um den Uebergang darunter. */
+    top:-10px;
+    bottom:-54px;
+    -webkit-backdrop-filter:blur(26px) saturate(115%);
+    backdrop-filter:blur(26px) saturate(115%);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 60px), transparent 100%);
+    mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 60px), transparent 100%);
   }
   /* Die Karte ist das, was schwebt: deckend, mit hellerer Kante und einem
      Schatten, der tiefer greift als bei den ruhenden Karten. Ohne den
@@ -1237,7 +1286,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.24";
+const APP_VERSION = "9.25";
 
 /* ================================================================== icons */
 const I = {
@@ -2029,6 +2078,21 @@ const isBw = id => !!(EX[id] || {}).bw;
    zurueck, Isolation nur den Muskel. Die Einstellung bleibt als Rueckfall
    und als Regler fuer alles, was keine eigene Angabe hat. */
 const restFor = id => (EX[id] || {}).rest || S.settings.rest || 120;
+/* Die Pausendauer als Text — und zwar bei der Uebung, nicht in den
+   Einstellungen. Am Gym Monster stellt er dieselbe Zeit am Geraet ein, und
+   dafuer muss sie sichtbar sein: sie ist je Uebung verschieden, von 45
+   Sekunden beim Bauch bis 3 Minuten beim Kreuzheben. */
+function pauseText(sek){
+  const s = Math.max(0, Math.round(+sek || 0));
+  if (s < 60) return s + " s";
+  const m = Math.floor(s / 60), r = s % 60;
+  return r ? m + ":" + String(r).padStart(2, "0") + " min" : m + " min";
+}
+/* Der Uebergang zur naechsten Uebung ist die halbe Pause, aber nie unter 45
+   und nie ueber 90 Sekunden: darunter kommt man nicht ans Geraet, darueber
+   steht man nur rum. Eine Stelle, weil sie an zwei Orten gebraucht wird —
+   beim Starten der Pause und beim Anzeigen der Zeiten. */
+const uebergangDauer = voll => Math.max(45, Math.min(90, Math.round((+voll || 0) / 2)));
 
 /* --- Aufwaermsaetze ----------------------------------------------
    Bisher wurden sie bewusst gar nicht erfasst. Das war richtig, solange es
@@ -2138,6 +2202,127 @@ function lastEntry(exId, exceptSessionId){
   }
   return null;
 }
+/* --- Gewicht haengt am Wiederholungsbereich, nicht nur an der Uebung -----
+
+   Kreuzheben steht an beiden Beintagen: an einem mit 4–6 Wiederholungen, am
+   anderen mit 8–10. Das ist dieselbe Bewegung, aber nicht dasselbe Gewicht —
+   und trotzdem hat die App bisher schlicht den letzten Eintrag der Uebung
+   genommen, egal aus welchem Bereich. Am Krafttag stand damit das Gewicht vom
+   Volumentag da, und die Regel "alle Saetze im Ziel" verglich zehn
+   Wiederholungen gegen ein Ziel von sechs.
+
+   Ab hier gilt: gesucht wird der letzte Eintrag **im selben Bereich**. Gibt es
+   keinen, wird der vorhandene umgerechnet, statt ihn unveraendert anzubieten. */
+
+/* Die Zielwiederholungszahl eines Programmpunkts. Bei einem Dichteblock die
+   Zielsumme auf die Saetze verteilt, sonst die Mitte des Bereichs. */
+function zielWdh(cfg){
+  if (!cfg) return 0;
+  if (cfg.total) return Math.max(1, Math.round(cfg.total[1] / Math.max(1, +cfg.sets || 1)));
+  const lo = +cfg.min || 0, hi = +cfg.max || 0;
+  return (lo + hi) / 2 || 0;
+}
+/* Der Programmpunkt einer Uebung in einem Plan. */
+function slotOf(exId, planId){
+  const pl = planOf(planId);
+  if (!pl) return null;
+  return (pl.ex || []).find(x => x.id === exId) || null;
+}
+/* Der Bereich, in dem ein alter Eintrag entstanden ist. Seit dieser Fassung
+   steht er im Eintrag selbst; fuer alles Aeltere wird er aus dem Plan der
+   damaligen Einheit nachgeschlagen. Beides kann fehlen — dann null, und der
+   Aufrufer behandelt den Eintrag als unbekannt statt als passend. */
+function zielVonEintrag(entry, session){
+  if (entry && entry.ziel) return +entry.ziel;
+  const s = slotOf(entry.id, session && session.plan);
+  return s ? zielWdh(s) : 0;
+}
+/* Wie weit zwei Bereiche auseinanderliegen duerfen und trotzdem dasselbe
+   Gewicht tragen. Anderthalb Wiederholungen: Seitheben mit 12–15 und mit
+   13–16 ist derselbe Satz, Bankdruecken mit 5–8 und mit 8–10 nicht. */
+const WDH_TOLERANZ = 1.5;
+
+/* Ein Gewicht von einem Wiederholungsbereich in einen anderen umrechnen.
+   Ueber die geschaetzte Maximalkraft nach Epley — dieselbe Formel, die die
+   App ohnehin fuer `e1rm` benutzt, nur einmal hin und einmal zurueck.
+
+   Der Sicherheitsabschlag ist Absicht: Epley ueberschaetzt bei vielen
+   Wiederholungen, und ein zu hoher erster Versuch an einem Krafttag ist
+   teurer als ein zu niedriger. Der Vorschlag ist ein Startpunkt zum
+   Antasten, keine Ansage. */
+const UMRECHNUNG_SICHER = 0.95;
+function umgerechnetGewicht(entry, zielReps){
+  if (!entry || !entry.reps.length || istZeit(entry.id) || !zielReps) return null;
+  const wdh = entry.reps.reduce((a,b) => a+b, 0) / entry.reps.length;
+  if (!wdh) return null;
+  /* Gerechnet wird mit der tatsaechlich bewegten Last: bei Klimmzuegen und
+     Dips gehoert das Koerpergewicht dazu, sonst rechnete die Formel mit den
+     fuenf Kilo am Guertel statt mit fuenfundachtzig. */
+  const koerper = entry.bw ? (+S.settings.bodyweight || 0) : 0;
+  const last = (entry.perSide ? entry.weight * 2 : entry.weight) + koerper;
+  if (last <= 0) return null;
+  const e1 = last * (1 + wdh / 30);
+  let ziel = e1 / (1 + zielReps / 30) * UMRECHNUNG_SICHER - koerper;
+  if (entry.perSide) ziel /= 2;
+  return Math.max(0, ziel);
+}
+
+/* Der letzte Eintrag, der zu diesem Programmpunkt passt.
+   Zuerst der letzte aus demselben Bereich. Gibt es keinen, der letzte
+   ueberhaupt — dann aber mit `umgerechnet`, damit der Aufrufer weiss, dass
+   das Gewicht nicht so dastand, sondern hergeleitet ist. */
+function passendesLetztes(exId, planId, exceptSessionId){
+  const ziel = zielWdh(slotOf(exId, planId));
+  let fremd = null;
+  for (let i = S.sessions.length - 1; i >= 0; i--) {
+    const s = S.sessions[i];
+    if (exceptSessionId && s.id === exceptSessionId) continue;
+    const e = (s.entries || []).find(x => x.id === exId && x.reps.length);
+    if (!e) continue;
+    const z = zielVonEintrag(e, s);
+    /* Ohne bekannten Bereich auf einer der beiden Seiten laesst sich nichts
+       unterscheiden — dann gilt der Eintrag wie bisher als passend. */
+    if (!ziel || !z || Math.abs(z - ziel) <= WDH_TOLERANZ) {
+      return {entry:e, session:s, ziel:z, umgerechnet:null};
+    }
+    if (!fremd) fremd = {entry:e, session:s, ziel:z};
+  }
+  if (!fremd) return null;
+  const w = umgerechnetGewicht(fremd.entry, ziel);
+  return {entry:fremd.entry, session:fremd.session, ziel:fremd.ziel,
+          umgerechnet: w == null ? null : snapTo(w, incOf(exId))};
+}
+
+/* Die letzten Eintraege einer Uebung aus demselben Wiederholungsbereich,
+   juengste zuerst. Ueberall dort, wo mehrere Einheiten verglichen werden —
+   und genau dort war der Fehler bisher am teuersten: fuenf Wiederholungen an
+   einem Krafttag zaehlten als "unter dem Ziel" eines Volumentags, und nach
+   drei davon senkte die App das Gewicht. */
+function passendeEintraege(exId, planId, n, exceptSessionId){
+  const ziel = zielWdh(slotOf(exId, planId));
+  const out = [];
+  for (let i = S.sessions.length - 1; i >= 0 && out.length < n; i--) {
+    const s = S.sessions[i];
+    if (exceptSessionId && s.id === exceptSessionId) continue;
+    const e = (s.entries || []).find(x => x.id === exId && x.reps.length);
+    if (!e) continue;
+    const z = zielVonEintrag(e, s);
+    if (ziel && z && Math.abs(z - ziel) > WDH_TOLERANZ) continue;
+    out.push({entry:e, session:s});
+  }
+  return out;
+}
+
+/* Das Gewicht, mit dem eine Uebung in diesen Plan startet. Der Steller soll
+   dort stehen, wo zuletzt in diesem Bereich gearbeitet wurde — nicht auf dem
+   letzten Wert irgendeiner Einheit. */
+function startgewicht(exId, planId){
+  const p = passendesLetztes(exId, planId);
+  if (p && p.umgerechnet != null) return p.umgerechnet;
+  if (p) return +p.entry.weight || 0;
+  return S.weights[exId] || 0;
+}
+
 function historyOf(exId){
   const out = [];
   S.sessions.forEach(s => s.entries.forEach(e => {
@@ -2170,15 +2355,15 @@ function evaluate(plan, entries, weights){
       /* Dieselbe Regel wie im Vorschlag vor der Einheit. Steigt das
          exzentrische Zusatzgewicht, wandert das direkt in die Einstellung der
          Uebung — es haengt nicht am Plan, sondern am Geraet. */
-      const st = steigerung(cfg.id, w, +e.ecc || 0, e.rir, hauptZuletztErhoeht(cfg.id, null));
+      const st = steigerung(cfg.id, w, +e.ecc || 0, e.rir, hauptZuletztErhoeht(cfg.id, null, plan.id));
       next[cfg.id] = st.weight;
       if (st.ecc !== (+e.ecc || 0)) setCfg(cfg.id, {ecc: st.ecc});
       changes.push({id:cfg.id, from:w, to:st.weight, ecc:st.ecc !== (+e.ecc||0) ? st.ecc : null,
                     why:st.why});
       return;
     }
-    const past = S.sessions.filter(s => s.entries.some(x => x.id === cfg.id && x.reps.length))
-      .slice(-2).map(s => s.entries.find(x => x.id === cfg.id));
+    /* Wie im Vorschlag: nur Einheiten aus demselben Wiederholungsbereich. */
+    const past = passendeEintraege(cfg.id, plan.id, 2).map(x => x.entry);
     /* Dieselbe Ausnahme wie im Vorschlag: eine abgebrochene Uebung ist kein
        Beleg dafuer, dass das Gewicht zu hoch war. */
     const weak = past.concat([e]).filter(x => x.reps.length && !x.abbruch &&
@@ -2259,15 +2444,11 @@ function steigerung(exId, w, ecc, rir, hauptZuletzt){
 }
 
 /* Ob beim letzten Mal das Hauptgewicht gestiegen ist. Daran haengt, wer als
-   Naechstes dran ist. Ohne zwei vergleichbare Eintraege: nein. */
-function hauptZuletztErhoeht(exId, bisSessionId){
-  const list = [];
-  for (let i = S.sessions.length - 1; i >= 0 && list.length < 2; i--) {
-    const s = S.sessions[i];
-    if (bisSessionId && s.id === bisSessionId) continue;
-    const e = (s.entries || []).find(x => x.id === exId && x.reps.length);
-    if (e) list.push(e);
-  }
+   Naechstes dran ist. Ohne zwei vergleichbare Eintraege: nein — und
+   vergleichbar heisst auch: aus demselben Wiederholungsbereich. */
+function hauptZuletztErhoeht(exId, bisSessionId, planId){
+  const list = passendeEintraege(exId, planId || (S.active && S.active.plan), 2, bisSessionId)
+    .map(x => x.entry);
   if (list.length < 2) return false;
   return (list[0].weight || 0) > (list[1].weight || 0);
 }
@@ -2275,7 +2456,11 @@ function hauptZuletztErhoeht(exId, bisSessionId){
 function gewichtVorschlag(exId, planId){
   const pl = planOf(planId || (S.active && S.active.plan));
   const cfg = pl && (pl.ex || []).find(x => x.id === exId);
-  const le = lastEntry(exId);
+  /* Nicht mehr der letzte Eintrag ueberhaupt, sondern der letzte aus diesem
+     Wiederholungsbereich. Vorher stand am Krafttag das Gewicht des
+     Volumentags da, und "alle Saetze im Ziel" verglich zehn Wiederholungen
+     gegen ein Ziel von sechs. */
+  const le = passendesLetztes(exId, pl && pl.id);
   if (!cfg || !le) return null;
 
   /* Ausgangspunkt ist immer das Gewicht der letzten tatsaechlich trainierten
@@ -2319,6 +2504,24 @@ function gewichtVorschlag(exId, planId){
             warum:"letztes Mal wegen Schmerzen abgebrochen", dazu:""};
   }
 
+  /* Diese Uebung gab es noch nie in diesem Wiederholungsbereich. Dann ist die
+     Frage nicht "steigern oder halten", sondern "womit ueberhaupt anfangen" —
+     und die Antwort ist das umgerechnete Gewicht aus dem anderen Bereich.
+     Ohne das stuende am Krafttag das Volumengewicht da, und der Vorschlag
+     verglich zehn geschaffte Wiederholungen mit einem Ziel von sechs. */
+  if (le.umgerechnet != null) {
+    const wdh = Math.round(reps.reduce((a,b) => a+b, 0) / reps.length);
+    const zielR = Math.round(zielWdh(cfg));
+    const woher = kg(w) + " kg × " + wdh + " Wdh.";
+    if (Math.abs(le.umgerechnet - w) < 0.001) {
+      return {von:w, auf:w, art:"halten",
+              warum:"aus " + woher + " umgerechnet — passt für " + zielR + " Wdh.", dazu:""};
+    }
+    return {von:w, auf:le.umgerechnet, art:"neu",
+            warum:"noch nie mit " + zielR + " Wdh. gemacht · aus " + woher + " umgerechnet",
+            dazu:"zum Antasten"};
+  }
+
   const oben = cfg.total ? summe >= cfg.total[1]
              : (reps.length >= cfg.sets && reps.every(r => r >= cfg.max));
 
@@ -2332,7 +2535,7 @@ function gewichtVorschlag(exId, planId){
               warum:"exzentrisch eine Stufe höher", dazu:""};
     }
     const ecc = Math.max(eccAlt, eccNun);
-    const st = steigerung(exId, w, ecc, rir, hauptZuletztErhoeht(exId));
+    const st = steigerung(exId, w, ecc, rir, hauptZuletztErhoeht(exId, null, pl && pl.id));
     /* Aendert sich gar nichts, ist das kein Vorschlag, sondern eine Sackgasse:
        alles im Ziel und trotzdem nichts zu steigern gibt es nur, wenn das
        Geraet am Anschlag ist. Dann sagt die App das auch so. */
@@ -2344,8 +2547,10 @@ function gewichtVorschlag(exId, planId){
             dazu: rir === 0 ? "aber nichts mehr übrig" : ""};
   }
 
-  const frueher = S.sessions.filter(s => s.entries.some(x => x.id === exId && x.reps.length))
-    .slice(-3).map(s => s.entries.find(x => x.id === exId));
+  /* Nur Einheiten aus demselben Wiederholungsbereich: fuenf Wiederholungen an
+     einem Krafttag liegen unter dem Ziel eines Volumentags, ohne dass das
+     Gewicht dort zu hoch waere. */
+  const frueher = passendeEintraege(exId, pl && pl.id, 3).map(x => x.entry);
   /* Ein Abbruch ist kein zu schweres Gewicht. Zaehlte er mit, wuerde die App
      nach drei unterbrochenen Einheiten das Gewicht senken, obwohl die Saetze,
      die stattfanden, sauber waren. */
@@ -3458,26 +3663,50 @@ function silhouette(st, kompakt){
     + '</div></details>';
 }
 
-/* Geschaetzte Dauer eines Plans in Minuten.
-   Je Satz: rund 20 Sekunden Vorbereitung plus drei Sekunden je Wiederholung,
-   dazu die Pause nach jedem Satz ausser dem letzten der Einheit. Der Wert ist
-   ein Sollwert, kein Mittel aus dem Verlauf — der Verlauf enthaelt genau die
-   Handypausen, die hier vermieden werden sollen. */
-function planDuration(pid){
-  const pl = planOf(pid);
-  if (!pl) return 0;
-  let sek = 0, saetze = 0;
-  (pl.ex || []).forEach(e => {
-    const n = Math.max(1, +e.sets || 3);
-    const wdh = e.total ? Math.round((e.total[0] + e.total[1]) / 2 / n) : ((+e.min || 8) + (+e.max || 10)) / 2;
+/* Geschaetzte Dauer einer Uebungsfolge in Sekunden.
+   Je Satz rund 20 Sekunden Vorbereitung plus drei Sekunden je Wiederholung.
+   Danach die Pause — die volle, solange in derselben Uebung noch ein Satz
+   folgt, sonst der kuerzere Uebergang; nach dem letzten Satz der Einheit gar
+   keine. Genau so laeuft es auch wirklich ab, siehe `restArt`. Vorher stand
+   hier die volle Pause nach jedem Satz, was die Uebergaenge um bis zu
+   anderthalb Minuten je Uebung zu lang schaetzte.
+
+   Der Wert ist ein Sollwert, kein Mittel aus dem Verlauf — der Verlauf
+   enthaelt genau die Handypausen, die hier vermieden werden sollen.
+
+   Eine Stelle fuer drei Fragen: wie lange dauert der Plan, wie lange noch,
+   und was passt in die Zeit, die heute da ist. Laufen die auseinander,
+   widerspricht die App sich selbst in derselben Ansicht. */
+function folgeDauer(liste){
+  const echt = liste.filter(x => x.saetze > 0);
+  let sek = 0;
+  echt.forEach((x, i) => {
+    const n = x.saetze;
+    const wdh = +x.wdh || 8;
     /* Bei Zeituebungen ist die Zahl schon die Dauer — sie mit drei Sekunden je
        Wiederholung zu multiplizieren machte aus einem Satz Haengen zwei
        Minuten. */
-    sek += n * (20 + (istZeit(e.id) ? wdh : wdh * 3)) + n * restFor(e.id);
-    saetze += n;
+    sek += n * (20 + (istZeit(x.id) ? wdh : wdh * 3));
+    sek += (n - 1) * restFor(x.id);
+    if (i < echt.length - 1) sek += uebergangDauer(restFor(x.id));
   });
-  sek -= restFor((pl.ex[pl.ex.length-1] || {}).id);      /* nach dem letzten Satz keine Pause */
-  return {minuten: Math.round(sek / 60), saetze: saetze};
+  return sek;
+}
+/* Die Wiederholungszahl, mit der ein Programmpunkt geplant ist. */
+function planWdh(e){
+  const n = Math.max(1, +e.sets || 3);
+  return e.total ? Math.round((e.total[0] + e.total[1]) / 2 / n)
+                 : ((+e.min || 8) + (+e.max || 10)) / 2;
+}
+const planFolge = liste => (liste || []).map(e =>
+  ({id:e.id, saetze:Math.max(1, +e.sets || 3), wdh:planWdh(e)}));
+
+function planDuration(pid){
+  const pl = planOf(pid);
+  if (!pl) return {minuten:0, saetze:0};
+  const folge = planFolge(pl.ex);
+  return {minuten: Math.round(folgeDauer(folge) / 60),
+          saetze: folge.reduce((a, x) => a + x.saetze, 0)};
 }
 
 function viewHeute(){
@@ -4234,11 +4463,15 @@ function muscleDots(st){
 }
 
 function sessionBodyState(){
-  const a = S.active, plan = planOf(a.plan);
+  const a = S.active;
   const best = prsFrom(S.sessions);
+  /* Ausgefallene Uebungen gehoeren nicht ins Soll. Solange sie mitzaehlten,
+     konnte sich die Figur nie fuellen, wenn etwas gestrichen wurde — und
+     genau das passiert jetzt regelmaessig, wenn die Zeit knapp ist. */
+  const liste = activeExList().filter(e => !(a.skipped || {})[e.id]);
   const mach = auswahl => ({
     kind:"lift", effort:3,
-    entries: (plan.ex || []).map(e => {
+    entries: liste.map(e => {
       const c = a.cfg[e.id] || {};
       const saetze = (a.sets[e.id] || []).filter(auswahl);
       return {id:e.id, bw:isBw(e.id), weight:a.weights[e.id], perSide:!!c.perSide,
@@ -4260,15 +4493,209 @@ function sessionBodyState(){
   });
 }
 
-/* Verbleibende Zeit: offene Saetze mal Satzzeit plus ihre Pausen. */
+/* Verbleibende Zeit: die offenen Saetze durch dieselbe Rechnung wie der Plan.
+   Ausgefallene Uebungen zaehlen nicht mit — sie finden nicht statt, und
+   solange sie mitzaehlten, sank die Restzeit beim Streichen nie. */
 function sessionLeftMin(){
-  const a = S.active, plan = planOf(a.plan);
-  let sek = 0;
-  (plan.ex || []).forEach(e => {
+  const a = S.active;
+  const liste = activeExList().filter(e => !(a.skipped || {})[e.id]).map(e => {
     const offen = (a.sets[e.id] || []).filter(s => !s.done);
-    offen.forEach(s => { sek += 20 + (s.reps || 8) * 3 + restFor(e.id); });
+    return {id:e.id, saetze:offen.length,
+            wdh: offen.length ? offen.reduce((x,s) => x + (+s.reps || 8), 0) / offen.length : 0};
   });
-  return Math.max(0, Math.round(sek / 60));
+  return Math.max(0, Math.round(folgeDauer(liste) / 60));
+}
+
+/* =============================================== Zeitbudget einer Einheit */
+/* Nicht jeder Tag hat 70 Minuten. Bisher war die Antwort darauf, mitten im
+   Training aufzuhoeren — und aufgehoert wird am Ende, also fielen genau die
+   Uebungen aus, die zuletzt stehen. Das ist die falsche Reihenfolge: die
+   Grunduebungen tragen die Einheit, die Nebenarbeit ist das, was verzichtbar
+   ist. Wer 30 Minuten hat, soll Kreuzheben und Kniebeuge machen und nicht
+   Waden und Bauch.
+
+   Die App entscheidet das nicht heimlich: sie zeigt, was wegfaellt, und der
+   volle Umfang ist immer einen Griff entfernt.
+
+   Wichtig oder nicht wird an der Pausendauer abgelesen. Die steht ohnehin je
+   Uebung fest und ist bereits genau diese Einordnung — 180 Sekunden beim
+   Kreuzheben, 45 beim Bauch. Eine zweite Liste danebenzustellen hiesse,
+   dieselbe Aussage an zwei Stellen zu pflegen und sie irgendwann
+   auseinanderlaufen zu lassen. */
+const ZEIT_STUFEN = [30, 45, 60];
+const ZEIT_GRUND = "Keine Zeit";      /* einer der SKIP_REASONS, bewusst */
+/* Ab dieser Pausendauer gilt eine Uebung als tragend: Klimmzuege, Rudern,
+   Kreuzheben, Kniebeuge, Bank, Dips, Schulterdruecken, Split Squats. */
+const KERN_PAUSE = 120;
+const istKern = id => restFor(id) >= KERN_PAUSE;
+/* Untergrenzen beim Kuerzen. Ein einzelner Satz ist kein Training; die erste
+   Uebung der Einheit traegt sie und behaelt drei. */
+const MIN_SAETZE = 2;
+const MIN_SAETZE_ERSTE = 3;
+
+/* Der volle Umfang der Einheit, unabhaengig davon, was schon gestrichen ist.
+   Gerechnet wird mit denselben Wiederholungen und Satzzahlen, die auch
+   `sessionLeftMin` sieht — sonst stuende auf dem einen Knopf "53 min" und
+   zwei Zeilen darunter "rund 54 min" fuer dieselbe Einheit. */
+const vollSaetze = e => Math.max(Math.max(1, +e.sets || 3),
+                                 ((S.active && S.active.sets[e.id]) || []).length);
+function vollWdh(e){
+  const rows = (S.active && S.active.sets[e.id]) || [];
+  return rows.length ? rows.reduce((x,s) => x + (+s.reps || 8), 0) / rows.length : planWdh(e);
+}
+function vollDauerMin(){
+  if (!S.active) return 0;
+  return Math.round(folgeDauer(activeExList().map(e =>
+    ({id:e.id, saetze:vollSaetze(e), wdh:vollWdh(e)}))) / 60);
+}
+
+/* Was in die vorhandene Zeit passt. Rechnet nur, aendert nichts. */
+function zeitPlan(minuten){
+  const a = S.active;
+  if (!a) return null;
+  const budget = Math.max(5, +minuten || 0) * 60;
+  const liste = activeExList().map((e, i) => ({
+    id:e.id, i:i, voll:vollSaetze(e), saetze:vollSaetze(e), wdh:vollWdh(e), kern:istKern(e.id)
+  }));
+  const dauer = () => folgeDauer(liste);
+
+  /* 1. Nebenuebungen streichen, von hinten. Die Reihenfolge im Plan ist seine
+        eigene Rangfolge — was ihm wichtiger ist, steht weiter vorn. Nach der
+        Pausendauer zu sortieren waere naheliegend, faellt aber falsch aus:
+        das Haengen traegt 90 Sekunden, weil die Sehne Zeit braucht, nicht
+        weil es wichtiger waere als Seitheben. */
+  const weg = [];
+  const kandidaten = liste.filter(x => !x.kern).sort((p, q) => q.i - p.i);
+  for (const k of kandidaten) {
+    if (dauer() <= budget) break;
+    k.saetze = 0;
+    weg.push(k.id);
+  }
+
+  /* 2. Reicht das nicht, Saetze kuerzen. Immer dort, wo gerade die meisten
+        stehen — sonst schrumpft die letzte Uebung auf zwei, waehrend vorn
+        noch fuenf stehen. */
+  let sicher = 0;
+  while (dauer() > budget && sicher++ < 300) {
+    const k = liste
+      .filter(x => x.saetze > (x.i === 0 ? MIN_SAETZE_ERSTE : MIN_SAETZE))
+      .sort((p, q) => q.saetze - p.saetze || q.i - p.i)[0];
+    if (!k) break;
+    k.saetze--;
+  }
+
+  /* 3. Was jetzt doch noch in die Zeit passt, kommt zurueck — notfalls mit
+        weniger Saetzen. Ohne diesen Schritt landete eine Einheit bei 40
+        Minuten, obwohl 45 da waren: gestrichen wird in ganzen Uebungen, und
+        die letzte davon hat oft mehr Platz genommen als noetig. Zurueck kommt
+        zuerst die wichtigste der gestrichenen — gestrichen wurde von hinten,
+        also ist das die zuletzt gestrichene. */
+  for (let k = weg.length - 1; k >= 0; k--) {
+    const x = liste.find(y => y.id === weg[k]);
+    if (!x) continue;
+    let n = 0;
+    while (n < x.voll) {
+      x.saetze = n + 1;
+      if (dauer() > budget) { x.saetze = n; break; }
+      n = x.saetze;
+    }
+    if (x.saetze >= MIN_SAETZE) weg.splice(k, 1); else x.saetze = 0;
+  }
+
+  return {liste:liste, weg:weg, minuten:Math.round(dauer() / 60),
+          passt: dauer() <= budget};
+}
+
+/* Alles zuruecknehmen, was eine frueher gewaehlte Zeit gestrichen hatte.
+   Ohne das summiert sich jede neue Auswahl auf die vorige, und von 45 auf 60
+   Minuten zu gehen wuerde nichts zurueckbringen. */
+function zeitZuruecksetzen(){
+  const a = S.active;
+  if (!a) return;
+  Object.keys(a.skipped || {}).forEach(id => {
+    if ((a.skipped[id] || {}).auto) delete a.skipped[id];
+  });
+  activeExList().forEach(e => {
+    const rows = a.sets[e.id] || (a.sets[e.id] = []);
+    const soll = Math.max(1, +e.sets || 3);
+    /* Nur auffuellen, nie abschneiden: ein selbst hinzugefuegter Satz gehoert
+       ihm, nicht dem Plan. */
+    while (rows.length < soll) rows.push({reps:(+e.max || 8), done:false});
+  });
+  a.zeit = 0;
+}
+
+function zeitAnwenden(minuten){
+  const a = S.active;
+  if (!a) return;
+  zeitZuruecksetzen();
+  const m = Math.max(0, Math.round(+minuten || 0));
+  if (!m || m >= vollDauerMin()) { save(); render(); toTop(); return; }
+  a.zeit = m;
+  const p = zeitPlan(m);
+  if (p) p.liste.forEach(x => {
+    if (!x.saetze) { a.skipped[x.id] = {reason:ZEIT_GRUND, auto:true}; return; }
+    const rows = a.sets[x.id] || [];
+    /* Nur offene Saetze fallen weg, und immer von hinten. Ein abgehakter Satz
+       hat stattgefunden und verschwindet nicht, weil die Zeit knapp wird. */
+    while (rows.length > x.saetze && !rows[rows.length - 1].done) rows.pop();
+  });
+  save(); render(); toTop();
+}
+
+/* Die Frage vor dem Start. Sie steht als eigene Karte und nicht in einem
+   Blatt: sie soll beantwortet werden, nicht gesucht. Nach dem Start
+   verschwindet sie — dann ist die Einheit im Gang und die Entscheidung
+   gefallen. */
+function zeitKarte(){
+  const a = S.active;
+  const voll = vollDauerMin();
+  const gewaehlt = +a.zeit || 0;
+  const stufen = ZEIT_STUFEN.filter(m => m < voll - 4);
+
+  const weg = activeExList().filter(e => ((a.skipped || {})[e.id] || {}).auto).map(e => e.id);
+  let kurz = 0;
+  activeExList().forEach(e => {
+    if ((a.skipped || {})[e.id]) return;
+    const fehlt = Math.max(1, +e.sets || 3) - (a.sets[e.id] || []).length;
+    if (fehlt > 0) kurz += fehlt;
+  });
+
+  let info;
+  if (!gewaehlt) {
+    info = '<span class="faint">Die Grundübungen bleiben immer stehen. Gekürzt wird bei der Nebenarbeit.</span>';
+  } else {
+    const teile = [];
+    if (weg.length) {
+      teile.push('<b>' + weg.map(id => esc(exName(id))).join(", ") + '</b> '
+                 + (weg.length > 1 ? 'fallen weg' : 'fällt weg'));
+    }
+    if (kurz) teile.push('<b>' + kurz + '</b> ' + (kurz === 1 ? 'Satz' : 'Sätze') + ' weniger');
+    if (!teile.length) teile.push('passt ohne Kürzung');
+    info = teile.join(' · ') + ' · rund <b>' + sessionLeftMin() + ' min</b>';
+  }
+
+  return '<div class="card zbudget">'
+    + '<div class="zb-kopf">Wie viel Zeit hast du heute?</div>'
+    + '<div class="zb-chips">'
+    + '<button class="chip'+(gewaehlt ? "" : " on")+'" data-a="budget" data-d="0">Voll · '+voll+' min</button>'
+    + stufen.map(m => '<button class="chip'+(gewaehlt === m ? " on" : "")+'" data-a="budget" data-d="'+m+'">'
+        + m + ' min</button>').join("")
+    + '<button class="chip'+(gewaehlt && stufen.indexOf(gewaehlt) < 0 ? " on" : "")+'" data-a="budgetnum">'
+    + (gewaehlt && stufen.indexOf(gewaehlt) < 0 ? gewaehlt + ' min' : 'Anders') + '</button>'
+    + '</div>'
+    + '<div class="zb-info">' + info + '</div>'
+    + '</div>';
+}
+
+/* Die Zeile unter dem Uebungsnamen: Ziel und Pausendauer. Die Pause steht
+   bewusst hier und nicht nur in den Einstellungen — sie ist je Uebung
+   verschieden und wird am Geraet nachgestellt. */
+function subText(e){
+  const ziel = e.total
+    ? 'Ziel ' + e.total[0] + '–' + e.total[1] + ' Wdh. gesamt'
+    : e.sets + ' × ' + (e.min === e.max ? e.min : e.min + '–' + e.max) + (istZeit(e.id) ? ' s' : '');
+  return ziel + ' · Pause ' + pauseText(restFor(e.id));
 }
 
 function viewSession(){
@@ -4278,12 +4705,14 @@ function viewSession(){
 
   /* live duel: tonnage so far against the same plan last time */
   let cur = 0, ref = 0;
-  plan.ex.forEach(e => {
+  activeExList().forEach(e => {
     const c = a.cfg[e.id] || {};
     const mk = {id:e.id, bw:isBw(e.id), weight:a.weights[e.id], perSide:!!c.perSide,
                 reps:(a.sets[e.id]||[]).filter(s => s.done).map(s => s.reps)};
     cur += tonnage(mk);
-    const le = lastEntry(e.id);
+    /* Verglichen wird mit derselben Uebung im selben Wiederholungsbereich —
+       sonst misst sich ein Krafttag am Volumen eines Volumentags. */
+    const le = passendesLetztes(e.id, a.plan);
     if (le) ref += tonnage(le.entry);
   });
   const ringR = 22, circ = 2 * Math.PI * ringR;
@@ -4318,14 +4747,19 @@ function viewSession(){
     + '<div id="restslot"></div>'
     + '</div></div>';
 
+  /* Die Frage nach der Zeit steht vor den Uebungen und nur vor dem Start:
+     danach ist sie beantwortet, und eine Einheit umzubauen, waehrend sie
+     laeuft, waere ein anderer Vorgang. */
+  if (!laeuft()) h += zeitKarte();
+
   /* Die Arbeit sichtbar machen, waehrend sie passiert. */
 
-  h += plan.ex.map(e => {
+  h += activeExList().map(e => {
     const rows = a.sets[e.id] || [];
     const c = Object.assign({perSide:false, ecc:0, chain:0, variant:""}, a.cfg[e.id] || {});
     const skip = (a.skipped || {})[e.id];
     const sum = rows.filter(s => s.done).reduce((x,s) => x + s.reps, 0);
-    const le = lastEntry(e.id);
+    const le = passendesLetztes(e.id, a.plan);
     const badges = [];
     if (c.perSide) badges.push('<span class="tag">pro Seite</span>');
     if (c.ecc) badges.push('<span class="tag on">Exz. +'+kg(c.ecc)+'</span>');
@@ -4341,9 +4775,7 @@ function viewSession(){
     return '<div class="card" style="margin-bottom:9px"><div class="exhead">'+exIcon(e.id, 54, 72)
       + '<div class="body"><div class="nm">'+esc(exName(e.id))+'</div>'
       + (c.variant ? '<div class="var">'+esc(c.variant)+'</div>' : '')
-      + '<div class="sub" data-sub="'+e.id+'">'
-      + (e.total ? 'Ziel '+e.total[0]+'–'+e.total[1]+' Wdh. gesamt'
-                 : e.sets+' × '+(e.min===e.max?e.min:e.min+'–'+e.max)+(istZeit(e.id)?' s':'')) + '</div>'
+      + '<div class="sub" data-sub="'+e.id+'">'+subText(e)+'</div>'
       + (badges.length ? '<div class="badges">'+badges.join("")+'</div>' : '')
       + '</div>'
       + '<div style="display:flex;align-items:center;gap:7px;flex-shrink:0">'
@@ -4372,6 +4804,11 @@ function viewSession(){
           + dateShort(le.session.date)
           + (le.session.plan && le.session.plan !== a.plan
               ? ' · aus ' + esc((planOf(le.session.plan) || {}).title || le.session.type) : '')
+          /* Stammt der Eintrag aus einem anderen Wiederholungsbereich, muss
+             das dastehen — sonst liest sich das Gewicht wie ein Vergleichswert,
+             obwohl es fuer einen anderen Satz galt. */
+          + (le.umgerechnet != null
+              ? ' · <b>anderer Bereich</b>' : '')
           + (le.entry.abbruch ? ' · <b>abgebrochen: '+esc(le.entry.abbruch)+'</b>' : '')
           + '</span></div>' : '')
       + '</div>';
@@ -4423,12 +4860,18 @@ function vorschlagZeile(exId, aktuell){
     + (eccZiel !== eccJetzt ? ' · exzentrisch +' + kg(eccZiel) : '');
 
   if (erreicht) {
-    return '<div class="vor an"><span>' + kg(jetzt) + ' kg'
-      + (eccJetzt ? ' · exz. +' + kg(eccJetzt) : '') + ' übernommen · ' + esc(v.warum) + '</span></div>';
+    /* Bei einer Umrechnung hat die App den Wert selbst gesetzt — "uebernommen"
+       waere dann eine Behauptung ueber eine Entscheidung, die er nie getroffen
+       hat. Es steht schlicht da, woher die Zahl kommt. */
+    const kopf = v.art === "neu"
+      ? 'Start bei ' + kg(jetzt) + ' kg'
+      : kg(jetzt) + ' kg' + (eccJetzt ? ' · exz. +' + kg(eccJetzt) : '') + ' übernommen';
+    return '<div class="vor an"><span>' + kopf + ' · ' + esc(v.warum) + '</span></div>';
   }
+  const wort = v.art === "hoch" ? "Vorschlag " : v.art === "neu" ? "Start bei " : "Zurück auf ";
   return '<button class="vor ' + v.art + '" data-a="vorok" data-id="' + exId + '" data-d="' + v.auf + '"'
     + ' data-e="' + eccZiel + '">'
-    + '<span><b>' + (v.art === "hoch" ? "Vorschlag " : "Zurück auf ") + ziel + '</b> · '
+    + '<span><b>' + wort + ziel + '</b> · '
     + esc(v.warum) + (v.dazu ? ' ' + esc(v.dazu) : '') + '</span>'
     + '<span class="vortag">Übernehmen</span></button>';
 }
@@ -4720,8 +5163,7 @@ function restArt(exId){
   if (!S.active) return {art:"voll"};
   const offenHier = (S.active.sets[exId] || []).some(x => !x.done);
   if (offenHier) return {art:"voll"};
-  const plan = planOf(S.active.plan);
-  const offenSonst = (plan ? plan.ex : []).some(e =>
+  const offenSonst = activeExList().some(e =>
     e.id !== exId && !(S.active.skipped || {})[e.id]
     && (S.active.sets[e.id] || []).some(x => !x.done));
   return {art: offenSonst ? "wechsel" : "ende"};
@@ -4729,16 +5171,17 @@ function restArt(exId){
 
 function startRest(exId){
   const art = exId ? restArt(exId).art : "voll";
-  if (art === "ende") { S.rest = null; restDone = true; save(); renderRest(); liveMelden(); return; }
+  if (art === "ende") {
+    S.rest = null; restDone = true; save(); renderRest(); liveMelden(); pausePlanen(); return;
+  }
   const voll = exId ? restFor(exId) : (S.settings.rest || 120);
-  /* Der Uebergang ist die halbe Pause, aber nie unter 45 und nie ueber 90
-     Sekunden: darunter kommt man nicht ans Geraet, darueber steht man nur rum. */
-  const dauer = art === "wechsel" ? Math.max(45, Math.min(90, Math.round(voll / 2))) : voll;
+  const dauer = art === "wechsel" ? uebergangDauer(voll) : voll;
   S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer, wechsel: art === "wechsel"};
   restDone = false;
   save();
   renderRest();
   liveMelden();
+  pausePlanen();
 }
 /* Ist die Pause um, gehoert der naechste Satz vor Augen. Ohne das sucht man
    nach jeder Pause selbst die Stelle wieder — und genau dabei landet man im
@@ -4746,9 +5189,10 @@ function startRest(exId){
    oberen Rand verdeckt. */
 function zumNaechstenSatz(){
   if (!S.active) return;
-  const plan = planOf(S.active.plan);
-  if (!plan) return;
-  for (const e of plan.ex) {
+  /* Ausgefallene Uebungen ueberspringen — sonst springt die Ansicht nach der
+     Pause auf eine Uebung, die heute gar nicht stattfindet. */
+  for (const e of activeExList()) {
+    if ((S.active.skipped || {})[e.id]) continue;
     const saetze = S.active.sets[e.id] || [];
     const i = saetze.findIndex(s => !s.done);
     if (i < 0) continue;
@@ -4772,9 +5216,8 @@ function zumNaechstenSatz(){
    einmal geweckt wird. */
 function naechsterOffenerSatz(){
   if (!S.active) return null;
-  const plan = planOf(S.active.plan);
-  if (!plan) return null;
-  for (const e of plan.ex) {
+  for (const e of activeExList()) {
+    if ((S.active.skipped || {})[e.id]) continue;
     const saetze = S.active.sets[e.id] || [];
     const i = saetze.findIndex(s => !s.done);
     if (i >= 0) return {id:e.id, nr:i + 1, von:saetze.length};
@@ -4809,7 +5252,16 @@ function tickRest(){
   liveMelden();
   if (!S.active || !S.rest) return;
   const left = restLeft();
-  if (left <= 0 && !restDone) { restDone = true; buzz(70); ton("ende"); zumNaechstenSatz(); }
+  if (left <= 0 && !restDone) {
+    restDone = true;
+    buzz(70);
+    /* Plant die Huelle den Ton selbst, hat er zum richtigen Zeitpunkt schon
+       geklungen — auch wenn das Telefon in der Tasche lag. Ihn hier noch
+       einmal zu spielen hiesse, beim Zurueckkommen ein zweites Mal zu piepen,
+       lange nachdem die Pause vorbei war. */
+    if (!pauseNativ()) ton("ende");
+    zumNaechstenSatz();
+  }
   renderRest();
 }
 setInterval(tickRest, 1000);
@@ -4849,6 +5301,24 @@ function unlockAudio(){
    oder Satz. In der Huelle kommen sie nativ — Web Audio war auf dem Telefon
    schlicht nicht zu hoeren, weil ein ablaufender Zeitgeber keine Nutzergeste
    ist und der Kontext einschlaeft, sobald die Ansicht nicht vorn ist. */
+/* --- Der Pausenton, wenn die App gar nicht vorn ist ---------------------
+   Waehrend der Pause liegt das Telefon auf der Bank oder in der Tasche. Genau
+   dann friert iOS die Zeitgeber der Webansicht ein: `tickRest` laeuft nicht
+   mehr, und der Ton kam erst, wenn man die App wieder aufmachte — also lange
+   nachdem die Pause vorbei war. Aus der Seite heraus ist das nicht loesbar,
+   egal wie der Ton erzeugt wird.
+
+   Die Huelle kann es: sie bekommt den Zeitpunkt des Pausenendes und stellt
+   sich selbst den Wecker. Gibt es sie nicht (im Browser), bleibt alles wie
+   bisher — dann klingt der Ton beim Zurueckkommen, was immer noch besser ist
+   als gar nichts. */
+const pauseNativ = () => typeof window !== "undefined" && !!window.__training_pause;
+function pausePlanen(){
+  if (!pauseNativ()) return;
+  const laeuftNoch = S.settings.sound && S.rest && !restDone && restLeft() > 0;
+  try { window.__training_pause(laeuftNoch ? S.rest.endsAt : 0); } catch(e){}
+}
+
 function ton(art){
   if (!S.settings.sound) return;
   if (typeof window !== "undefined" && window.__training_sound) {
@@ -4916,14 +5386,14 @@ const WARMUP_S = 180;
 function startWarmup(){
   S.rest = {endsAt: Date.now() + WARMUP_S * 1000, total: WARMUP_S, warm: true};
   restDone = false;
-  save(); renderRest(); liveMelden();
+  save(); renderRest(); liveMelden(); pausePlanen();
 }
 function startNow(nachOben){
   if (!S.active || S.active.startedAt) return;
   S.active.startedAt = Date.now();
   /* Ein laufendes Aufwaermen endet mit dem Start — sonst liefe die
      Aufwaermzeile in die erste Satzpause hinein. */
-  if (S.rest && S.rest.warm) { S.rest = null; restDone = true; }
+  if (S.rest && S.rest.warm) { S.rest = null; restDone = true; pausePlanen(); }
   keepAwake(true);
   save();
   /* Der einzige Neuaufbau waehrend einer Einheit: die Kopfzeile tauscht den
@@ -5088,7 +5558,9 @@ function exOptsSheet(exId){
   const c = Object.assign({perSide:false, ecc:0, chain:0, variant:""}, a.cfg[exId] || {});
   openSheet('<h3>'+esc(exName(exId))+'</h3>'
     + '<div class="sh-sub">'+(c.variant ? esc(c.variant)+' — ' : '')
-    + 'gilt für diese Übung, auch in kommenden Einheiten.</div>'
+    + 'gilt für diese Übung, auch in kommenden Einheiten.<br>'
+    + 'Pause zwischen den Sätzen: <b>'+pauseText(restFor(exId))+'</b>'
+    + ' · Übergang zur nächsten Übung: <b>'+pauseText(uebergangDauer(restFor(exId)))+'</b></div>'
     + '<div class="opt"><div class="lbl2"><div>Gewicht zählt</div>'
     + '<div class="d">Bei einseitigen Übungen und Hanteln: pro Seite. Für Volumen wird verdoppelt.</div></div>'
     + '<div class="seg"><button data-a="ps" data-id="'+exId+'" data-d="0" class="'+(!c.perSide?"on":"")+'">Gesamt</button>'
@@ -6377,7 +6849,10 @@ function startSession(id, extra){
   list.forEach(e => {
     sets[e.id] = [];
     for (let i = 0; i < e.sets; i++) sets[e.id].push({reps:e.max, done:false});
-    weights[e.id] = S.weights[e.id] || 0;
+    /* Nicht mehr `S.weights` — das ist eine Zahl je Uebung und kennt den
+       Unterschied zwischen Kraft- und Volumentag nicht. Der Steller startet
+       dort, wo zuletzt in diesem Wiederholungsbereich gearbeitet wurde. */
+    weights[e.id] = startgewicht(e.id, id);
     cf[e.id] = cfgOf(e.id);
   });
   /* extras are appended to the plan copy for this session only */
@@ -6388,7 +6863,7 @@ function startSession(id, extra){
      Vorher lief die Uhr, sobald man nur nachsehen wollte, welche Uebungen
      anstehen — im echten Verlauf standen dadurch 186, 128 und 103 Minuten. */
   S.active = {plan:id, extra:(extra||[]).map(m => m.id), startedAt:0,
-              sets:sets, weights:weights, cfg:cf, skipped:{}};
+              sets:sets, weights:weights, cfg:cf, skipped:{}, zeit:0};
   S.rest = null;
   keepAwake(true);
   save(); render(); toTop();
@@ -6441,7 +6916,7 @@ function tauscheUebung(altId, neuId){
   /* Die alte Liste faellt weg, sobald die Uebung nicht mehr in der Einheit
      steht — sie waere sonst ein Satzstand ohne Uebung. */
   if (altId !== neuId) delete a.sets[altId];
-  if (a.weights[neuId] === undefined) a.weights[neuId] = S.weights[neuId] || 0;
+  if (a.weights[neuId] === undefined) a.weights[neuId] = startgewicht(neuId, a.plan);
   if (!a.cfg[neuId]) a.cfg[neuId] = cfgOf(neuId);
   save(); render();
   msg(exName(neuId) + " statt " + exName(altId) + " — nur für heute.");
@@ -6460,6 +6935,11 @@ function finishSession(){
          weil erst er die Wiederholungen einordnet — und weil der Vorschlag
          beim naechsten Mal genau daraus liest. */
       rir:(a.rir || {})[e.id],
+      /* Der Wiederholungsbereich, in dem dieser Satz entstanden ist. Er wird
+         mitgeschrieben statt spaeter aus dem Plan nachgeschlagen: der Plan ist
+         aenderbar, der gelaufene Satz nicht. Ohne ihn wuerde ein Umstellen von
+         5–8 auf 8–10 die gesamte Vergangenheit umdeuten. */
+      ziel: zielWdh(e),
       abbruch:(a.abbruch || {})[e.id] || null,
       skipped:sk ? {reason:sk.reason} : null,
       reps:sk ? [] : (a.sets[e.id]||[]).filter(s => s.done).map(s => s.reps)
@@ -6512,6 +6992,8 @@ function finishSession(){
   S.weights = Object.assign({}, S.weights, ev.next);
   S.active = null;
   S.rest = null;
+  restDone = true;
+  pausePlanen();
   keepAwake(false);
   save();
   summary = {changes:ev.changes, prs:prs, duel:duel, planTitle:plan.title};
@@ -6637,6 +7119,16 @@ document.addEventListener("click", ev => {
     setCfg(id, {variant:v});
     closeSheet(); save(); render(); return;
   }
+  /* ---- Zeitbudget ---- */
+  if (a === "budget") { buzz(13); zeitAnwenden(d); return; }
+  if (a === "budgetnum") {
+    buzz();
+    numSheet({title:"Zeit heute", sub:"Minuten, die du zur Verfügung hast. Die Grundübungen bleiben stehen.",
+              value:(S.active && S.active.zeit) || vollDauerMin(), quick:[-15,-5,5,15],
+              apply:v => zeitAnwenden(v)});
+    return;
+  }
+
   if (a === "skipask") { skipSheet(id); return; }
   if (a === "skipdo") {
     S.active.skipped[id] = {reason:el.dataset.r};
@@ -6681,9 +7173,9 @@ document.addEventListener("click", ev => {
       kind:"lift", plan:pl.id, type:pl.type, minutes:60, effort:null, form:null, note:"",
       entries: pl.ex.map(e => {
         const c = cfgOf(e.id);
-        return {id:e.id, name:exName(e.id), bw:isBw(e.id), weight:S.weights[e.id] || 0,
+        return {id:e.id, name:exName(e.id), bw:isBw(e.id), weight:startgewicht(e.id, pl.id),
           perSide:!!c.perSide, ecc:+c.ecc||0, chain:+c.chain||0, variant:c.variant||"",
-          note:"", skipped:null,
+          note:"", skipped:null, ziel:zielWdh(e),
           reps: Array.from({length:e.sets || 3}, () => e.max || 8)};
       })
     };
@@ -7110,7 +7602,7 @@ document.addEventListener("click", ev => {
     if (box) box.insertAdjacentHTML("beforeend", setRow(cfg, arr[arr.length-1], arr.length-1));
     updateCount(); return;
   }
-  if (a === "skiprest") { S.rest = null; save(); renderRest(); return; }
+  if (a === "skiprest") { S.rest = null; restDone = true; pausePlanen(); save(); renderRest(); return; }
   if (a === "finish") { abschlussPruefen(); return; }
   if (a === "abbruchdo") {
     buzz();
@@ -7123,7 +7615,8 @@ document.addEventListener("click", ev => {
   if (a === "abbruchok") { closeSheet(); finishSession(); return; }
   if (a === "cancel") {
     if (confirm("Training verwerfen? Die Sätze gehen verloren.")) {
-      S.active = null; S.rest = null; keepAwake(false); save(); route = null; render(); toTop();
+      S.active = null; S.rest = null; restDone = true; pausePlanen();
+      keepAwake(false); save(); route = null; render(); toTop();
     }
     return;
   }
@@ -7158,7 +7651,7 @@ function updateSub(cfg){
   if (c) { c.textContent = sum; c.classList.toggle("on", sum > 0); }
   if (cfg.total) {
     const el = document.querySelector('[data-sub="'+cfg.id+'"]');
-    if (el) el.textContent = 'Ziel ' + cfg.total[0] + '–' + cfg.total[1] + ' Wdh. gesamt';
+    if (el) el.textContent = subText(cfg);
   }
 }
 /* Sets belonging to a skipped exercise must leave the denominator, otherwise the
@@ -7210,7 +7703,9 @@ function updateDuel(){
     const c = a.cfg[e.id] || {};
     cur += tonnage({id:e.id, bw:isBw(e.id), weight:a.weights[e.id], perSide:!!c.perSide,
                     reps:(a.sets[e.id]||[]).filter(s => s.done).map(s => s.reps)});
-    const le = lastEntry(e.id);
+    /* Derselbe Vergleich wie beim Aufbau der Ansicht — sonst springt die
+       Zahl beim ersten abgehakten Satz auf einen anderen Bezug. */
+    const le = passendesLetztes(e.id, a.plan);
     if (le) ref += tonnage(le.entry);
   });
   const el = document.getElementById("duel");
@@ -7228,6 +7723,9 @@ healthLogSchreiben(healthNow());
 askPersist();
 render();
 tickRest();
+/* Laeuft beim Start noch eine Pause — die Huelle war weg, die Zeit lief
+   weiter —, bekommt sie ihren Wecker sofort wieder gestellt. */
+pausePlanen();
 if ("serviceWorker" in navigator) {
   /* When a new worker takes over, reload once so the user actually sees the update
      instead of the previously cached shell. All state lives in localStorage, so a
