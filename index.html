@@ -4607,22 +4607,32 @@ const istKern = id => restFor(id) >= KERN_PAUSE;
 const MIN_SAETZE = 2;
 const MIN_SAETZE_ERSTE = 3;
 
-/* Der volle Umfang der Einheit, unabhaengig davon, was schon gestrichen ist.
-   Gerechnet wird mit denselben Wiederholungen und Satzzahlen, die auch
-   `sessionLeftMin` sieht — sonst stuende auf dem einen Knopf "53 min" und
-   zwei Zeilen darunter "rund 54 min" fuer dieselbe Einheit. */
+/* Der volle Umfang eines Programmpunkts: mindestens die Planzahl, aber nie
+   weniger als das, was in dieser Einheit schon eingetragen ist. Genutzt von
+   `zeitPlan` beim Kuerzen und von `vollDauerMin`, das daraus ein plan-
+   aehnliches Objekt baut — nur so bleibt der volle Umfang stabil, auch wenn
+   zwischenzeitlich schon gestrichen wurde. */
 const vollSaetze = e => Math.max(Math.max(1, +e.sets || 3),
                                  ((S.active && S.active.sets[e.id]) || []).length);
 function vollWdh(e){
   const rows = (S.active && S.active.sets[e.id]) || [];
   return rows.length ? rows.reduce((x,s) => x + (+s.reps || 8), 0) / rows.length : planWdh(e);
 }
+/* Der volle Umfang der Einheit, unabhaengig davon, was schon gestrichen ist —
+   weder eine bereits angewandte Zeitbudget-Kuerzung noch eine gestrichene
+   Uebung duerfen den Wert veraendern. `ablauf()` ohne Argumente sieht genau
+   diese beiden Dinge, waere hier also falsch: es laese die Kuerzung mitzaehlen
+   und gestrichene Uebungen wegfallen. Stattdessen der Plan-Zweig von
+   `ablauf(plan)` auf ein aus `activeExList()` gebautes Objekt mit den vollen
+   Satzzahlen — derselbe Zweig, den `planDuration` fuer einen gespeicherten
+   Plan nimmt, nur mit `vollSaetze` statt der Planzahl. Die Blockstruktur
+   (`blk`) bleibt dabei erhalten, weil sie am Programmpunkt selbst haengt. */
 function vollDauerMin(){
   if (!S.active) return 0;
-  const st = S.active.sets || {};
-  const alle = ablauf().map(s =>
-    Object.assign({}, s, {wdh: +((st[s.ex] || [])[s.i] || {}).reps || planWdh(s.cfg)}));
-  return Math.round(folgeDauer(alle) / 60);
+  const voll = {ex: activeExList().map(e => Object.assign({}, e, {sets: vollSaetze(e)}))};
+  const schritte = ablauf(voll).map(s =>
+    Object.assign({}, s, {wdh: vollWdh({id: s.ex})}));
+  return Math.round(folgeDauer(schritte) / 60);
 }
 
 /* Was in die vorhandene Zeit passt. Rechnet nur, aendert nichts. */
