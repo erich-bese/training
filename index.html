@@ -3690,32 +3690,82 @@ function silhouette(st, kompakt){
     + '</div></details>';
 }
 
-/* Geschaetzte Dauer einer Uebungsfolge in Sekunden.
-   Je Satz rund 20 Sekunden Vorbereitung plus drei Sekunden je Wiederholung.
-   Danach die Pause — die volle, solange in derselben Uebung noch ein Satz
-   folgt, sonst der kuerzere Uebergang; nach dem letzten Satz der Einheit gar
-   keine. Genau so laeuft es auch wirklich ab, siehe `restArt`. Vorher stand
-   hier die volle Pause nach jedem Satz, was die Uebergaenge um bis zu
-   anderthalb Minuten je Uebung zu lang schaetzte.
+/* ================================================= Ablauf einer Einheit */
+/* Die flache, geordnete Schrittliste — die einzige Quelle fuer Reihenfolge,
+   Pausenart und Dauer. Fokusmodus und Listenansicht lesen dieselbe Liste,
+   sonst laufen sie auseinander.
 
-   Der Wert ist ein Sollwert, kein Mittel aus dem Verlauf — der Verlauf
-   enthaelt genau die Handypausen, die hier vermieden werden sollen.
+   `blk` macht aus mehreren Programmpunkten einen Wechselblock: Runde fuer
+   Runde je ein Satz, statt alle Saetze einer Uebung am Stueck. Sind die
+   Satzzahlen ungleich, laeuft der Block weiter, bis die laengste Reihe durch
+   ist — erschoepfte Uebungen fallen in der Runde einfach aus. */
+function ablauf(plan, sets){
+  /* Ohne Argumente: die laufende Einheit. Mit Plan: der volle Umfang, wie ihn
+     `planDuration` fuer die Vorschau braucht. */
+  const ausAktiv = !plan;
+  const liste = ausAktiv ? activeExList() : (plan.ex || []);
+  const stand = ausAktiv ? (S.active.sets || {}) : (sets || null);
+  const uebersprungen = ausAktiv ? (S.active.skipped || {}) : {};
 
-   Eine Stelle fuer drei Fragen: wie lange dauert der Plan, wie lange noch,
-   und was passt in die Zeit, die heute da ist. Laufen die auseinander,
-   widerspricht die App sich selbst in derselben Ansicht. */
-function folgeDauer(liste){
-  const echt = liste.filter(x => x.saetze > 0);
+  const satzZahl = e => {
+    if (stand && stand[e.id]) return stand[e.id].length;
+    return Math.max(1, +e.sets || 3);
+  };
+
+  const schritte = [];
+  let i = 0;
+  while (i < liste.length) {
+    const e = liste[i];
+    if (uebersprungen[e.id]) { i++; continue; }
+    if (!e.blk) {
+      for (let k = 0; k < satzZahl(e); k++)
+        schritte.push({art:"satz", ex:e.id, i:k, cfg:e});
+      i++;
+      continue;
+    }
+    /* Alle unmittelbar folgenden Punkte mit derselben Blockkennung
+       einsammeln. Bewusst nur zusammenhaengend: ein Block, der im Plan
+       auseinandergerissen steht, waere ein Fehler im Plan und soll nicht
+       stillschweigend wieder zusammengezogen werden. */
+    const blk = [];
+    while (i < liste.length && liste[i].blk === e.blk) {
+      if (!uebersprungen[liste[i].id]) blk.push(liste[i]);
+      i++;
+    }
+    const runden = blk.reduce((m, x) => Math.max(m, satzZahl(x)), 0);
+    for (let r = 0; r < runden; r++)
+      blk.forEach(x => {
+        if (r < satzZahl(x)) schritte.push({art:"satz", ex:x.id, i:r, cfg:x});
+      });
+  }
+  return schritte;
+}
+/* Nur was noch aussteht. Grundlage fuer Pausenart, Restzeit und den Sprung
+   nach der Pause. */
+function ablaufOffen(){
+  if (!S.active) return [];
+  const st = S.active.sets || {};
+  return ablauf().filter(s => !((st[s.ex] || [])[s.i] || {}).done);
+}
+/* Die Dauer einer Schrittfolge. Je Schritt: die Zeit des Satzes selbst, dann
+   die Pause, die danach faellt. Welche das ist, entscheidet allein der
+   naechste Schritt — dieselbe Uebung heisst volle Pause, eine andere den
+   kuerzeren Uebergang, kein naechster Schritt gar keine.
+
+   Vorher rechnete diese Funktion je Uebung und setzte damit voraus, dass
+   alle Saetze einer Uebung am Stueck laufen. Mit Wechselsaetzen stimmt das
+   nicht mehr, und die Zahl waere um Minuten daneben. */
+function folgeDauer(schritte){
   let sek = 0;
-  echt.forEach((x, i) => {
-    const n = x.saetze;
-    const wdh = +x.wdh || 8;
-    /* Bei Zeituebungen ist die Zahl schon die Dauer — sie mit drei Sekunden je
-       Wiederholung zu multiplizieren machte aus einem Satz Haengen zwei
+  (schritte || []).forEach((s, i) => {
+    const wdh = +s.wdh || (s.cfg ? planWdh(s.cfg) : 8);
+    /* Bei Zeituebungen ist die Zahl schon die Dauer — sie mit drei Sekunden
+       je Wiederholung zu multiplizieren machte aus einem Satz Haengen zwei
        Minuten. */
-    sek += n * (20 + (istZeit(x.id) ? wdh : wdh * 3));
-    sek += (n - 1) * restFor(x.id);
-    if (i < echt.length - 1) sek += uebergangDauer(restFor(x.id));
+    sek += 20 + (istZeit(s.ex) ? wdh : wdh * 3);
+    const n = schritte[i + 1];
+    if (!n) return;
+    sek += n.ex === s.ex ? restFor(s.ex) : uebergangDauer(restFor(s.ex));
   });
   return sek;
 }
@@ -3725,15 +3775,12 @@ function planWdh(e){
   return e.total ? Math.round((e.total[0] + e.total[1]) / 2 / n)
                  : ((+e.min || 8) + (+e.max || 10)) / 2;
 }
-const planFolge = liste => (liste || []).map(e =>
-  ({id:e.id, saetze:Math.max(1, +e.sets || 3), wdh:planWdh(e)}));
 
 function planDuration(pid){
   const pl = planOf(pid);
   if (!pl) return {minuten:0, saetze:0};
-  const folge = planFolge(pl.ex);
-  return {minuten: Math.round(folgeDauer(folge) / 60),
-          saetze: folge.reduce((a, x) => a + x.saetze, 0)};
+  const schritte = ablauf(pl);
+  return {minuten: Math.round(folgeDauer(schritte) / 60), saetze: schritte.length};
 }
 
 function viewHeute(){
@@ -4524,13 +4571,13 @@ function sessionBodyState(){
    Ausgefallene Uebungen zaehlen nicht mit — sie finden nicht statt, und
    solange sie mitzaehlten, sank die Restzeit beim Streichen nie. */
 function sessionLeftMin(){
-  const a = S.active;
-  const liste = activeExList().filter(e => !(a.skipped || {})[e.id]).map(e => {
-    const offen = (a.sets[e.id] || []).filter(s => !s.done);
-    return {id:e.id, saetze:offen.length,
-            wdh: offen.length ? offen.reduce((x,s) => x + (+s.reps || 8), 0) / offen.length : 0};
-  });
-  return Math.max(0, Math.round(folgeDauer(liste) / 60));
+  if (!S.active) return 0;
+  const st = S.active.sets || {};
+  /* Die eingestellte Wiederholungszahl des offenen Satzes, nicht die des
+     Plans: wer den Steller heruntergedreht hat, meint das auch so. */
+  const offen = ablaufOffen().map(s =>
+    Object.assign({}, s, {wdh: +((st[s.ex] || [])[s.i] || {}).reps || 8}));
+  return Math.max(0, Math.round(folgeDauer(offen) / 60));
 }
 
 /* =============================================== Zeitbudget einer Einheit */
@@ -4572,8 +4619,10 @@ function vollWdh(e){
 }
 function vollDauerMin(){
   if (!S.active) return 0;
-  return Math.round(folgeDauer(activeExList().map(e =>
-    ({id:e.id, saetze:vollSaetze(e), wdh:vollWdh(e)}))) / 60);
+  const st = S.active.sets || {};
+  const alle = ablauf().map(s =>
+    Object.assign({}, s, {wdh: +((st[s.ex] || [])[s.i] || {}).reps || planWdh(s.cfg)}));
+  return Math.round(folgeDauer(alle) / 60);
 }
 
 /* Was in die vorhandene Zeit passt. Rechnet nur, aendert nichts. */
@@ -5181,19 +5230,17 @@ function renderRest(){
   if (p) p.style.width = (frac*100).toFixed(1) + "%";
 }
 /* Was nach diesem Satz noch offen ist — daran haengt, wie lange die Pause
-   ueberhaupt sein soll. Drei Faelle, drei Antworten:
-   nichts mehr offen  -> gar keine Pause. Die Einheit ist vorbei.
-   nur noch anderswo  -> Uebergang statt Pause. Das Umbauen dauert ohnehin,
-                         und der naechste Muskel ist ein anderer.
-   dieselbe Uebung    -> die volle Pause. Nur hier zaehlt sie wirklich. */
+   sein soll. Gefragt wird der Ablauf, nicht die Uebung:
+   naechster Schritt dieselbe Uebung -> volle Pause
+   naechster Schritt eine andere     -> Uebergang. Das Umbauen dauert ohnehin,
+                                        und der naechste Muskel ist ein anderer
+   kein naechster Schritt            -> gar keine. Die Einheit ist vorbei.
+   Ohne Wechselblock ist das genau das bisherige Verhalten. */
 function restArt(exId){
   if (!S.active) return {art:"voll"};
-  const offenHier = (S.active.sets[exId] || []).some(x => !x.done);
-  if (offenHier) return {art:"voll"};
-  const offenSonst = activeExList().some(e =>
-    e.id !== exId && !(S.active.skipped || {})[e.id]
-    && (S.active.sets[e.id] || []).some(x => !x.done));
-  return {art: offenSonst ? "wechsel" : "ende"};
+  const offen = ablaufOffen();
+  if (!offen.length) return {art:"ende"};
+  return {art: offen[0].ex === exId ? "voll" : "wechsel"};
 }
 
 function startRest(exId){
@@ -5216,21 +5263,13 @@ function startRest(exId){
    oberen Rand verdeckt. */
 function zumNaechstenSatz(){
   if (!S.active) return;
-  /* Ausgefallene Uebungen ueberspringen — sonst springt die Ansicht nach der
-     Pause auf eine Uebung, die heute gar nicht stattfindet. */
-  for (const e of activeExList()) {
-    if ((S.active.skipped || {})[e.id]) continue;
-    const saetze = S.active.sets[e.id] || [];
-    const i = saetze.findIndex(s => !s.done);
-    if (i < 0) continue;
-    const row = document.querySelector('[data-row="'+e.id+':'+i+'"]');
-    if (row) {
-      row.scrollIntoView({block:"center", behavior:"smooth"});
-      row.classList.add("dran");
-      setTimeout(() => row.classList.remove("dran"), 2200);
-    }
-    return;
-  }
+  const s = ablaufOffen()[0];
+  if (!s) return;
+  const row = document.querySelector('[data-row="'+s.ex+':'+s.i+'"]');
+  if (!row) return;
+  row.scrollIntoView({block:"center", behavior:"smooth"});
+  row.classList.add("dran");
+  setTimeout(() => row.classList.remove("dran"), 2200);
 }
 
 /* ---------------------------------------------------------- Live Activity */
@@ -5242,14 +5281,11 @@ function zumNaechstenSatz(){
    Sperrbildschirm zaehlt daraus selbst herunter, ohne dass die App auch nur
    einmal geweckt wird. */
 function naechsterOffenerSatz(){
-  if (!S.active) return null;
-  for (const e of activeExList()) {
-    if ((S.active.skipped || {})[e.id]) continue;
-    const saetze = S.active.sets[e.id] || [];
-    const i = saetze.findIndex(s => !s.done);
-    if (i >= 0) return {id:e.id, nr:i + 1, von:saetze.length};
-  }
-  return null;
+  const offen = ablaufOffen();
+  if (!offen.length) return null;
+  const s = offen[0];
+  const alle = (S.active.sets[s.ex] || []).length;
+  return {id:s.ex, nr:s.i + 1, von:alle};
 }
 function liveMelden(){
   if (typeof window === "undefined" || !window.__training_live) return;
