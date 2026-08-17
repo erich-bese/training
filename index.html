@@ -3228,6 +3228,20 @@ function weekAhead(){
   return tage;
 }
 
+/* Der zuletzt trainierte Ganzkoerperplan. Nicht der zuletzt *geoeffnete* —
+   nur Einheiten mit Saetzen zaehlen, sonst dreht ein versehentliches Oeffnen
+   die Reihenfolge um. */
+function letzterGanzkoerper(){
+  for (let i = S.sessions.length - 1; i >= 0; i--) {
+    const s = S.sessions[i];
+    if (s.kind !== "lift") continue;
+    if (s.plan !== "fullA" && s.plan !== "fullB") continue;
+    if (!(s.entries || []).some(e => (e.reps || []).length)) continue;
+    return s.plan;
+  }
+  return null;
+}
+
 function recommend(){
   const st = muscleState();
   const by = muscleMap(st);
@@ -3235,6 +3249,17 @@ function recommend(){
   const lvl = form ? form.level : null;
 
   const sys = systemLoad();
+
+  /* Gemeinsamer Tagesform-Hinweis: gilt fuer den regulaeren Vorschlag genauso
+     wie fuer den A/B-Wechsel weiter unten, deshalb hier einmal berechnet statt
+     zweimal hingeschrieben. Ohne die Aufzaehlung der Gruende: die stehen einen
+     Tipp entfernt im Nervensystem-Blatt, und die Erholung steht als Zahl schon
+     oben im Kopf. Hier zaehlt nur, was das fuer die naechste Stunde heisst. */
+  const hint = lvl === "gelb"
+    ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
+    : sys.level === "erhoeht"
+    ? "Erhöhte Grundbelastung. Heute nicht bis ans Muskelversagen."
+    : null;
 
   if (lvl === "rot") {
     return {kind:"rest", level:lvl, form:form, state:st, sys:sys,
@@ -3250,6 +3275,22 @@ function recommend(){
       why:"Mehrere Zeichen sprechen für eine Pause: " + sys.gruende.join(", ") + ". "
         + "Das Nervensystem trägt alles zusammen, nicht je Muskelgruppe — "
         + "ein Tag Pause bringt hier mehr als eine weitere Einheit."};
+  }
+
+  /* Ganzkoerper A und B wechseln sich ab, und zwar hart: die App merkt sich,
+     was zuletzt dran war, und nimmt das andere. Ueber die Punktebewertung
+     ginge das auch ungefaehr — A und B treffen fast dieselben Muskeln, also
+     entschiede der Rueckstand. "Ungefaehr" ist hier aber zu wenig: wer
+     zweimal hintereinander Kniebeuge bekommt, hat vier Wochen kein
+     Kreuzheben gemacht. */
+  const ganz = letzterGanzkoerper();
+  if (ganz && planOf(ganz === "fullB" ? "fullA" : "fullB")) {
+    const pid = ganz === "fullB" ? "fullA" : "fullB";
+    return {kind:"plan", planId:pid, level:lvl, form:form, state:st, sys:sys,
+      why:"Zuletzt " + (ganz === "fullB" ? "Kreuzheben" : "Kniebeuge")
+        + " — heute ist " + (pid === "fullA" ? "die Kniebeuge" : "das Kreuzheben")
+        + " dran. Der Rest der Einheit bleibt gleich.",
+      hint: hint};
   }
 
   const lastLift = S.sessions.slice().reverse().find(s => s.kind === "lift");
@@ -3291,14 +3332,7 @@ function recommend(){
   return {
     kind:"plan", planId:best.pid, level:lvl, form:form, state:st, sys:sys,
     why:reasonFor(best.pid, st, istAeltester),
-    hint: lvl === "gelb"
-      ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
-      /* Ohne die Aufzaehlung: die Gruende stehen einen Tipp entfernt im
-         Nervensystem-Blatt, und die Erholung steht als Zahl schon oben im
-         Kopf. Hier zaehlt nur, was das fuer die naechste Stunde heisst. */
-      : sys.level === "erhoeht"
-      ? "Erhöhte Grundbelastung. Heute nicht bis ans Muskelversagen."
-      : null
+    hint: hint
   };
 }
 
