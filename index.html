@@ -1874,6 +1874,22 @@ const DEFAULT_PLANS = {
     {id:"pushdown", sets:2, min:8,  max:12, blk:"ar", prio:3},
     {id:"lateral",  sets:2, min:10, max:15, blk:"ar", prio:3}]}
 };
+/* Der Sammelplan "full" ist mit 10.0 aus DEFAULT_PLANS gefallen. Wer beim
+   Umstieg gerade eine Einheit damit laufen hatte, muss sie trotzdem mit
+   ihren ursprünglichen Übungen zu Ende bringen können — sonst wirft jede
+   Stelle, die für die laufende Einheit `planOf(a.plan)` aufruft (Kopfzeile,
+   Übungsliste, Tausch, Abschluss), einen TypeError, sobald der neue Code
+   aktiv wird. Diese Kopie dient ausschließlich diesem Rückfall: Sie taucht
+   nirgends in `plans()`/`DEFAULT_PLANS` auf und ist deshalb weder wählbar
+   noch empfohlen — `planOf` reicht sie nur genau dann heraus, wenn sonst
+   nichts unter "full" zu finden ist. */
+const PLAN_FULL_LEGACY = {id:"full", type:"Ganzkörper", title:"Ganzkörper", noSuggest:true, ex:[
+  {id:"squat",    sets:3, min:5, max:8},
+  {id:"bench",    sets:3, min:6, max:9},
+  {id:"pullup",   sets:4, min:3, max:5},
+  {id:"rdl",      sets:3, min:8, max:10},
+  {id:"lateral",  sets:2, min:12, max:15},
+  {id:"abs",      sets:2, min:12, max:20}]};
 const DEFAULT_WEIGHTS = {
   pullup:0, row:40, row1:25, facepull:20, reardelt:25, curl:12, hammer:25,
   bench:40, incline:30, dips:0, ohp:25, lateral:8, triceps:15, pushdown:15,
@@ -2005,6 +2021,7 @@ const EMPTY = () => ({
      einer Woche. */
   healthLog:[],
   griffNachgetragen:false,/* einmaliges Nachtragen des Haengens in eigene Plaene */
+  ganzkoerperNachgetragen:false,/* einmaliges Nachtragen von fullA/fullB in eigene Plaene */
   settings:{bodyweight:80, rest:120, sound:true, plates:[1.25, 2.5, 5], eccMax:10}
 });
 
@@ -2135,7 +2152,11 @@ function save(){
 
 /* plans: defaults unless the user edited them */
 const plans = () => S.plans || DEFAULT_PLANS;
-const planOf = id => plans()[id];
+/* "full" faellt hier zurueck auf `PLAN_FULL_LEGACY`, wenn plans() nichts
+   liefert — damit kommt eine noch laufende Alt-Einheit ueber den Umstieg,
+   ohne dass "full" irgendwo waehlbar wieder auftaucht: `plans()` selbst
+   kennt den Schluessel nicht mehr, nur dieser gezielte Rueckfall. */
+const planOf = id => plans()[id] || (id === "full" ? PLAN_FULL_LEGACY : undefined);
 function editablePlans(){
   if (!S.plans) S.plans = JSON.parse(JSON.stringify(DEFAULT_PLANS));
   return S.plans;
