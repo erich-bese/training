@@ -1404,7 +1404,7 @@ const EX = {
   legpress:   {name:"Beinpresse",             pat:"legpress", mehr:true, inc:1, rest:150},
   latpull:    {name:"Latzug",                 pat:"vpull", mehr:true, inc:1, rest:120},
   uprow:      {name:"Aufrechtes Rudern",      pat:"uprow", mehr:true, inc:1, rest:90},
-  fly:        {name:"Fliegende am Seil",      pat:"fly",   mehr:true, inc:1, rest:90},
+  fly:        {name:"Butterfly",              pat:"fly",   mehr:true, inc:1, rest:90},
   closegrip:  {name:"Enges Bankdrücken",      pat:"bench", mehr:true, inc:1, rest:150},
   pushup:     {name:"Liegestütze",            pat:"bench", mehr:true, bw:true, inc:1.25, rest:90},
   skull:      {name:"Stirndrücken",           pat:"tri",   mehr:true, inc:1, rest:90},
@@ -1786,13 +1786,13 @@ const DEFAULT_PLANS = {
      die Erschoepfung statt der Kraft — und genau er entscheidet ueber das
      Ziel "Klimmzuege am Stueck". Ein einzelner Satz vorweg stoert die
      Kraftarbeit danach nicht nennenswert. */
-  pullA:{id:"pullA", type:"Pull", title:"Pull · Kraft", ex:[
+  pullA:{id:"pullA", type:"Pull", title:"Pull · Kraft", noSuggest:true, ex:[
     {id:"pullmax",  sets:1, min:1, max:30},
     {id:"pullup",   sets:5, min:3, max:5},
     {id:"row",      sets:4, min:6, max:10},
     {id:"facepull", sets:3, min:12, max:15},
     {id:"curl",     sets:3, min:8, max:12}]},
-  pushA:{id:"pushA", type:"Push", title:"Push · Kraft", ex:[
+  pushA:{id:"pushA", type:"Push", title:"Push · Kraft", noSuggest:true, ex:[
     {id:"bench",    sets:5, min:5, max:8},
     {id:"dips",     sets:4, min:5, max:8},
     {id:"ohp",      sets:3, min:6, max:9},
@@ -1802,13 +1802,13 @@ const DEFAULT_PLANS = {
        Haengen hier am Ende und nicht an den Zugtagen, wo Klimmzuege und
        Kreuzheben ihn ohnehin ausreizen. Sekunden, keine Wiederholungen. */
     {id:"hang",     sets:3, min:30, max:60}]},
-  pullB:{id:"pullB", type:"Pull", title:"Pull · Volumen", ex:[
+  pullB:{id:"pullB", type:"Pull", title:"Pull · Volumen", noSuggest:true, ex:[
     {id:"pullmax",  sets:1, min:1, max:30},
     {id:"pullup",   sets:8, min:2, max:4, total:[28,34]},
     {id:"row1",     sets:4, min:8, max:12},
     {id:"reardelt", sets:3, min:12, max:15},
     {id:"hammer",   sets:3, min:8, max:12}]},
-  pushB:{id:"pushB", type:"Push", title:"Push · Volumen", ex:[
+  pushB:{id:"pushB", type:"Push", title:"Push · Volumen", noSuggest:true, ex:[
     {id:"bench",    sets:4, min:8, max:10},
     {id:"dips",     sets:4, min:6, max:10},
     {id:"incline",  sets:3, min:8, max:10},
@@ -1819,30 +1819,60 @@ const DEFAULT_PLANS = {
      Einheit, einmal das Kreuzheben. Der Unterschied steckt in Saetzen und
      Wiederholungen, nicht in zwei Uebungen namens "leicht" und "schwer" —
      Kreuzheben ist Kreuzheben. */
-  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge", ex:[
+  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge", noSuggest:true, ex:[
     {id:"squat",    sets:5, min:5, max:8},
     {id:"deadlift", sets:3, min:8, max:10},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben", ex:[
+  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben", noSuggest:true, ex:[
     {id:"deadlift", sets:4, min:4, max:6},
     {id:"squat",    sets:4, min:8, max:10},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  /* Für Tage, an denen nur eine Einheit drin ist: je ein Muster pro Richtung.
-     noSuggest: wird nie automatisch empfohlen. In einem Splitplan wuerde er das
-     sonst regelmaessig gewinnen, weil er alle Gruppen trifft. Waehlbar bleibt er. */
-  full:{id:"full", type:"Ganzkörper", title:"Ganzkörper", noSuggest:true, ex:[
-    {id:"squat",    sets:3, min:5, max:8},
-    {id:"bench",    sets:3, min:6, max:9},
-    {id:"pullup",   sets:4, min:3, max:5},
-    {id:"rdl",      sets:3, min:8, max:10},
-    {id:"lateral",  sets:2, min:12, max:15},
-    {id:"abs",      sets:2, min:12, max:20}]}
+  /* Die sechs Splitplaene bleiben waehlbar, werden aber nicht mehr empfohlen.
+     Bei zwei bis drei Einheiten pro Woche saehe jeder von ihnen rechnerisch
+     alle zwei bis drei Wochen einen Reiz — zu selten, um Kraft aufzubauen.
+     Empfohlen wird deshalb nur noch Ganzkoerper A/B. */
+  /* Ganzkoerper A und B. Der Unterschied ist genau eine Uebung: einmal traegt
+     die Kniebeuge die Einheit, einmal das Kreuzheben. Alles andere ist
+     gleich, damit jede Einheit denselben Kern hat und nichts durchs Raster
+     faellt, wenn zwischen zwei Einheiten eine Woche liegt.
+
+     `blk` heisst Wechselblock: Klimmzuege und Dips laufen Satz um Satz im
+     Wechsel, ebenso die beiden Zirkel. Dadurch liegen zwischen zwei
+     Klimmzugsaetzen gut drei Minuten, ohne dass drei Minuten dastehen.
+
+     `prio` ist die Rangfolge beim Kuerzen: 1 bleibt immer, 3 faellt zuerst —
+     und immer der ganze Block, nie ein halber Zirkel. */
+  fullA:{id:"fullA", type:"Ganzkörper", title:"Ganzkörper A · Kniebeuge", ex:[
+    {id:"pullup",   sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    {id:"dips",     sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    {id:"squat",    sets:2, min:6,  max:8,            prio:1},
+    {id:"fly",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"row",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"ohp",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"curl",     sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"pushdown", sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"lateral",  sets:2, min:10, max:15, blk:"ar", prio:3}]},
+  fullB:{id:"fullB", type:"Ganzkörper", title:"Ganzkörper B · Kreuzheben", ex:[
+    {id:"pullup",   sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    {id:"dips",     sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    /* 5 bis 8: `zielWdh` ergibt 6,5 und liegt damit genau auf `WDH_TOLERANZ`
+       zum schweren Beintag (4–6, also 5). Die beiden Bereiche gelten deshalb
+       als derselbe. Entschaerft ist das durch den Import vom 17.08.: der ist
+       der neueste passende Eintrag, und `passendesLetztes` nimmt den
+       neuesten. Wer hier den Bereich aendert, prueft das erneut. */
+    {id:"deadlift", sets:2, min:5,  max:8,            prio:1},
+    {id:"fly",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"row",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"ohp",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"curl",     sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"pushdown", sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"lateral",  sets:2, min:10, max:15, blk:"ar", prio:3}]}
 };
 const DEFAULT_WEIGHTS = {
   pullup:0, row:40, row1:25, facepull:20, reardelt:25, curl:12, hammer:25,
@@ -2038,6 +2068,24 @@ function migrate(d){
     });
   }
   out.griffNachgetragen = true;
+
+  /* Wer seine Plaene schon bearbeitet hat, hat eine eigene Kopie — die kennt
+     die Ganzkoerperplaene nicht, und ohne diesen Schritt taucht die neue
+     Voreinstellung bei ihm nie auf. Genau einmal, und nur was fehlt: nimmt er
+     sie wieder heraus, bleiben sie draussen. */
+  if (out.plans && !out.ganzkoerperNachgetragen) {
+    ["fullA", "fullB"].forEach(pid => {
+      if (!out.plans[pid]) out.plans[pid] = JSON.parse(JSON.stringify(DEFAULT_PLANS[pid]));
+    });
+    /* Der alte Sammelplan geht in Ganzkoerper A auf. Gespeicherte Einheiten
+       mit `plan:"full"` bleiben unangetastet im Verlauf — sie tragen ihren
+       Typ selbst. */
+    delete out.plans.full;
+    ["pullA","pushA","pullB","pushB","legsA","legsB"].forEach(pid => {
+      if (out.plans[pid]) out.plans[pid].noSuggest = true;
+    });
+  }
+  out.ganzkoerperNachgetragen = true;
 
   out.sessions = (Array.isArray(d.sessions) ? d.sessions : []).map(s => ({
     id: s.id || String(Math.round(Math.random()*1e9)),
