@@ -5190,16 +5190,47 @@ function fokusSchritt(){
    Ziel" bleibt unberuehrt (`evaluate` laeuft ueber `plan.ex`, und dort steht
    `pullmax` nicht), und die Uebung gibt es schon samt Zeichnung. */
 const KLIMM_TAGESZIEL = 20;
+/* Der Programmpunkt "Klimmzuege" kann fuer diese Einheit getauscht sein
+   (`tauscheUebung`, "Gegen andere Uebung tauschen") — dann liegen die
+   Saetze nicht mehr unter der ID "pullup", sondern unter der, gegen die
+   getauscht wurde. `a.ersatz` bildet das ab, genau wie `tauscheUebung`
+   selbst es beim Zurueckrechnen auf die Wurzel benutzt — hier reicht die
+   einfache Vorwaertsrichtung, weil die Wurzel immer feststeht ("pullup"),
+   anders als bei `tauscheUebung`, das von einer beliebigen Start-ID aus
+   zurueckrechnen muss. Ohne diese Aufloesung sucht `klimmStand()` bzw.
+   `extraEinfuegen()` nach einer ID, die es in der Einheit nicht mehr gibt —
+   der Zaehler verliert bereits geleistete Wiederholungen, und der
+   Zusatzsatz landet wieder ganz am Ende. */
+function pullupAktuell(){
+  const a = S.active;
+  return (a && a.ersatz && a.ersatz.pullup) || "pullup";
+}
 function klimmStand(){
   if (!S.active) return {summe:0, offen:0};
   const zaehl = id => (S.active.sets[id] || [])
     .filter(s => s.done).reduce((a, s) => a + (+s.reps || 0), 0);
-  const summe = zaehl("pullup") + zaehl("pullmax");
+  /* `pullupAktuell()`, nicht das hartkodierte "pullup": die Saetze gehoeren
+     zum Programmpunkt, nicht zur Uebungs-ID (dieselbe Regel, die schon in
+     `tauscheUebung` gilt) — schon geleistete Klimmzuege zaehlen also auch
+     dann noch, wenn der Rest der Einheit inzwischen getauscht wurde. */
+  const summe = zaehl(pullupAktuell()) + zaehl("pullmax");
   return {summe:summe, offen:Math.max(0, KLIMM_TAGESZIEL - summe)};
 }
 /* Sind alle Klimmzugsaetze abgehakt und die Uebung damit durch? Nur dann
    steht die Frage nach dem Zusatzsatz an — mitten im Block waere sie eine
-   Aufforderung, die naechste Runde ausfallen zu lassen. */
+   Aufforderung, die naechste Runde ausfallen zu lassen.
+
+   Bewusst *nicht* ueber `pullupAktuell()` aufgeloest, anders als
+   `klimmStand()`: das hier ist der Schalter, der ueberhaupt erst entscheidet,
+   ob der Tagesziel-Schirm erscheinen darf. Wurde "Klimmzuege" gegen etwas
+   anderes getauscht, hat der Nutzer bewusst keine Klimmzuege mehr gemacht —
+   der Schirm soll dann nicht mit "N Klimmzüge" aufwarten, waehrend in
+   Wirklichkeit eine andere Uebung laeuft. Bleibt die Suche hier hart auf
+   "pullup", kann der Schirm nach einem Tausch fuer den Rest der Einheit gar
+   nicht mehr erscheinen — die Einladung zum Zusatzsatz ruht, ohne dass es
+   dafuer eigenen Code braucht. Schon geleistete Wiederholungen gehen dabei
+   nicht verloren: die zaehlt `klimmStand()` weiterhin, dieser Schirm zeigt
+   sie nur nicht mehr an. */
 function klimmDurch(){
   if (!S.active) return false;
   const rows = S.active.sets.pullup || [];
@@ -5267,7 +5298,7 @@ function viewFokus(){
      gehoert. Auf `klimmDurch()` allein zu pruefen hiesse, mitten im Wechsel
      nach dem Zusatzsatz zu fragen, waehrend noch ein Dipsatz aussteht. */
   const blockDurch = klimmDurch()
-    && (!s || (s.cfg && s.cfg.blk) !== (slotOf("pullup", a.plan) || {}).blk);
+    && (s.cfg && s.cfg.blk) !== (slotOf("pullup", a.plan) || {}).blk;
   if (blockDurch && !hatZusatz && !a.zusatzWeg) {
     const zuViel = (formForToday() && formForToday().level === "gelb")
                 || systemLoad().level !== "normal";
@@ -7448,10 +7479,16 @@ function importSheet(data){
    sollte der eigene Zusatzsatz vermeiden. Alles andere, was ueber "Uebung
    hinzufuegen" gewaehlt wird, ist keine Variante einer Plan-Uebung und bleibt
    am Ende, wie bisher. Eine allgemeine Einfuegeposition fuer Extras waere
-   spekulativ fuer einen einzigen Anwendungsfall — diese enge Regel reicht. */
+   spekulativ fuer einen einzigen Anwendungsfall — diese enge Regel reicht.
+
+   Gesucht wird ueber `pullupAktuell()`, nicht ueber die hartkodierte ID
+   "pullup": wurde "Klimmzuege" schon gegen etwas anderes getauscht (`data-a=
+   "tauschDo"` in `tauscheUebung`), steht der Block unter der neuen ID, und
+   die hartkodierte Suche liefe ins Leere — `pullmax` laendete wieder am Ende,
+   genau der Fehler, den diese Funktion beheben soll. */
 function extraEinfuegen(list, item){
   if (item.id !== "pullmax") { list.push(item); return; }
-  const puIdx = list.findIndex(x => x.id === "pullup");
+  const puIdx = list.findIndex(x => x.id === pullupAktuell());
   if (puIdx < 0) { list.push(item); return; }
   /* Hinter den ganzen Wechselblock, nicht nur hinter den ersten Eintrag:
      Klimmzuege und Dips laufen unter derselben `blk`-Kennung, und der
