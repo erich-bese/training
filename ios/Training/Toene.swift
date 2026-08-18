@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import UserNotifications
+import UIKit
 
 /// The sounds of a session, generated rather than shipped as files.
 ///
@@ -126,13 +127,23 @@ enum Toene {
 ///    even an app the system did kill, and on a silenced phone it is the
 ///    vibration in the pocket. Suppressed while the app is frontmost, because
 ///    there the tone has already been heard.
+///
+/// Wer Musik hoert, soll sie waehrend der Pause nicht verlieren: die Sitzung
+/// bleibt auf `.mixWithOthers`, bis drei Sekunden vor Ende — dann senkt sich
+/// die fremde Wiedergabe kurz per `.duckOthers`, damit die 3-2-1-Vorwarnung
+/// und der Endton durchdringen, und hebt sich danach wieder.
 final class Pausenwecker: NSObject, UNUserNotificationCenterDelegate {
 
     static let shared = Pausenwecker()
 
-    private var wecker: Timer?
+    /// Alle Timer der laufenden Pause: die drei Vorwarntoene und der
+    /// Endton. Beim Abbrechen muessen es alle sein, nicht nur der letzte.
+    private var timer: [Timer] = []
     private var stille: AVAudioPlayer?
     private var gefragt = false
+    /// Haelt fest, ob die fremde Wiedergabe gerade abgesenkt ist — sonst
+    /// wuerde jeder der drei Vorwarntoene erneut `duckenAn()` aufrufen.
+    private var gedimmt = false
 
     private static let kennung = "pause"
 
@@ -147,26 +158,95 @@ final class Pausenwecker: NSObject, UNUserNotificationCenterDelegate {
         guard rest > 0.4 else { return }
 
         wachHalten()
-        let t = Timer(timeInterval: rest, repeats: false) { [weak self] _ in
-            Toene.spiel("ende")
-            /* Der Ton ist raus — ab hier gibt es keinen Grund mehr, die App
-               wach zu halten. Weiterlaufende Stille waere nur Batterie. */
-            self?.stilleBeenden()
-            self?.wecker = nil
+
+        /* Drei kurze Toene als Vorwarnung, dann der eigentliche. Wer Musik
+           hoert, braucht den Anlauf: ein einzelner Piep geht im Takt unter.
+           Absolute Zeitpunkte statt Restdauern — dieselbe Regel wie beim
+           Endton, ein Timer mit `timeInterval:` ueberlebt das Wegschalten
+           nicht zuverlaessig. */
+        for versatz in [-3.0, -2.0, -1.0, 0.0] {
+            let wann = ende.addingTimeInterval(versatz)
+            guard wann > Date() else { continue }
+            let art = versatz == 0.0 ? "ende" : "count"
+            let t = Timer(fire: wann, interval: 0, repeats: false) { [weak self] _ in
+                guard let self else { return }
+                /* Absenken beim ersten Ton, der tatsaechlich noch faellig
+                   ist — nicht zwingend beim -3s-Ton, der Wecker kann auch
+                   spaeter mit weniger Vorlauf gestellt werden (Neuladen
+                   waehrend der letzten Sekunden der Pause). */
+                if !self.gedimmt {
+                    self.gedimmt = true
+                    self.duckenAn()
+                }
+                Toene.spiel(art)
+                if art == "ende" {
+                    self.haptik()
+                    /* Der Ton ist raus — ab hier gibt es keinen Grund mehr,
+                       die App wach zu halten. Weiterlaufende Stille waere
+                       nur Batterie. */
+                    self.stilleBeenden()
+                    /* Erst nachdem der Ton durch ist, sonst schneidet die
+                       Freigabe der Sitzung ihn ab. */
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+                        self?.duckenAus()
+                    }
+                }
+            }
+            /* `.common`, damit er auch waehrend einer Scroll-Geste feuert. */
+            RunLoop.main.add(t, forMode: .common)
+            timer.append(t)
         }
-        /* `.common`, damit er auch waehrend einer Scroll-Geste feuert. */
-        RunLoop.main.add(t, forMode: .common)
-        wecker = t
 
         melden(zu: ende)
     }
 
     func absagen() {
-        wecker?.invalidate()
-        wecker = nil
+        timer.forEach { $0.invalidate() }
+        timer.removeAll()
+        /* Auch wenn keine Vorwarnung mehr lief: schadet nicht, und faengt
+           genau den Fall, in dem waehrend der Vorwarnung uebersprungen wird
+           — sonst bleibt die Musik leise. */
+        duckenAus()
         stilleBeenden()
         UNUserNotificationCenter.current()
             .removePendingNotificationRequests(withIdentifiers: [Self.kennung])
+    }
+
+    // MARK: - Ducking
+
+    /// Senkt fremde Wiedergabe ab. Bewusst erst kurz vor dem Ton und nicht
+    /// fuer die ganze Pause — sonst laeuft die Musik drei Minuten lang leise.
+    private func duckenAn() {
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playback, mode: .default, options: [.duckOthers])
+        try? AVAudioSession.sharedInstance().setActive(true)
+    }
+
+    /// Gibt die Lautstaerke wieder frei. Das Absenken haengt an der
+    /// Deaktivierung der Sitzung, nicht am blossen Kategoriewechsel —
+    /// `setActive(false, options: .notifyOthersOnDeactivation)` ist der
+    /// Teil, der Spotify und Apple Music tatsaechlich wieder hochfahren
+    /// laesst. Ohne ihn bleibt die Musik leise.
+    private func duckenAus() {
+        guard gedimmt else {
+            return
+        }
+        gedimmt = false
+        try? AVAudioSession.sharedInstance().setActive(
+            false, options: [.notifyOthersOnDeactivation])
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playback, mode: .default, options: [.mixWithOthers])
+    }
+
+    /// Nur im Vordergrund — im Hintergrund gibt iOS keine Haptik aus. Der
+    /// Ton kommt in beiden Faellen, die lokale Mitteilung ebenfalls.
+    private func haptik() {
+        guard UIApplication.shared.applicationState == .active else {
+            return
+        }
+        let g = UINotificationFeedbackGenerator()
+        g.prepare()
+        g.notificationOccurred(.success)
     }
 
     // MARK: - Wachbleiben
@@ -177,6 +257,12 @@ final class Pausenwecker: NSObject, UNUserNotificationCenterDelegate {
            Puffer waere nur mehr Speicher fuer dieselbe Wirkung. */
         guard let daten = Toene.stille(1.0) else { return }
         do {
+            /* Waehrend der Pause laeuft die Musik des Nutzers unangetastet
+               weiter. `.mixWithOthers` heisst: wir sind hier, aber wir
+               stoeren nicht — bis `duckenAn()` das kurz vor dem Endton
+               aendert. */
+            try? AVAudioSession.sharedInstance().setCategory(
+                .playback, mode: .default, options: [.mixWithOthers])
             try? AVAudioSession.sharedInstance().setActive(true)
             let p = try AVAudioPlayer(data: daten)
             p.numberOfLoops = -1
