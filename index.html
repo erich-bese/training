@@ -1360,6 +1360,32 @@
   }
   .fokus .fk-fuss .btn{min-height:62px; font-size:16px}
 
+  /* Der Countdown: einmal gebaut, danach nur beschriftet (siehe `fokusPause`
+     und `renderRest`). `tabular-nums` haelt die Breite fest, sonst springt
+     die Zahl bei jedem Sekundenwechsel minimal in der Breite. */
+  .fokus .fk-count{
+    font-size:82px; font-weight:700; letter-spacing:-.04em;
+    line-height:1; color:var(--bone); font-variant-numeric:tabular-nums;
+  }
+  .fokus .fk-pauselbl{
+    font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--faint); font-weight:640; margin-top:11px;
+  }
+  .fokus .fk-danach{
+    margin-top:34px; padding-top:19px; border-top:1px solid var(--line);
+    width:100%; max-width:280px;
+  }
+  /* Kleiner als die Zeichnung auf dem Satz-Schirm (`.fk-art`): auf dem
+     Pausenschirm bleibt der Countdown das beherrschende Element, die
+     Zeichnung orientiert nur auf das, was als Naechstes kommt. */
+  .fokus .fk-danach-art{
+    height:min(13vh, 100px); width:auto; aspect-ratio:3/4;
+    margin:0 auto 8px; color:var(--dim); opacity:1;
+  }
+  .fokus .fk-danachtitel{
+    font-size:17px; font-weight:640; color:var(--dim); margin-bottom:5px;
+  }
+
   /* ---- motion ---- */
   @keyframes rise{from{transform:translateY(14px); opacity:0} to{transform:none; opacity:1}}
   @keyframes fade{from{opacity:0} to{opacity:1}}
@@ -3892,6 +3918,21 @@ function silhouette(st, kompakt){
    Runde je ein Satz, statt alle Saetze einer Uebung am Stueck. Sind die
    Satzzahlen ungleich, laeuft der Block weiter, bis die laengste Reihe durch
    ist — erschoepfte Uebungen fallen in der Runde einfach aus. */
+/* Die Aufwaermstufen einer Uebung als Ablaufschritte. Nur bei den schweren
+   Grunduebungen (`aufwaermPlan` prueft das selbst ueber die Pausendauer) und
+   nur, solange noch kein Arbeitssatz steht — danach sind sie erledigt.
+   Sie zaehlen ausdruecklich nicht in die Satzzahl, nicht ins Volumen und
+   nicht in die Erholungsrechnung; gespeichert wird von ihnen nichts. */
+function warmSchritte(exId){
+  if (!S.active) return [];
+  const rows = S.active.sets[exId] || [];
+  if (rows.some(s => s.done)) return [];
+  const plan = aufwaermPlan(exId, S.active.weights[exId]);
+  if (!plan) return [];
+  const fertig = (S.active.warm || {})[exId] || 0;
+  return plan.map((st, k) => ({art:"aufwaerm", ex:exId, i:k,
+                               gewicht:st.gewicht, wdh:st.wdh, erledigt:k < fertig}));
+}
 function ablauf(plan, sets){
   /* Ohne Argumente: die laufende Einheit. Mit Plan: der volle Umfang, wie ihn
      `planDuration` fuer die Vorschau braucht. */
@@ -3911,6 +3952,7 @@ function ablauf(plan, sets){
     const e = liste[i];
     if (uebersprungen[e.id]) { i++; continue; }
     if (!e.blk) {
+      if (ausAktiv) warmSchritte(e.id).forEach(x => schritte.push(x));
       for (let k = 0; k < satzZahl(e); k++)
         schritte.push({art:"satz", ex:e.id, i:k, cfg:e});
       i++;
@@ -3925,6 +3967,7 @@ function ablauf(plan, sets){
       if (!uebersprungen[liste[i].id]) blk.push(liste[i]);
       i++;
     }
+    if (ausAktiv) blk.forEach(x => warmSchritte(x.id).forEach(y => schritte.push(y)));
     const runden = blk.reduce((m, x) => Math.max(m, satzZahl(x)), 0);
     for (let r = 0; r < runden; r++)
       blk.forEach(x => {
@@ -3938,7 +3981,9 @@ function ablauf(plan, sets){
 function ablaufOffen(){
   if (!S.active) return [];
   const st = S.active.sets || {};
-  return ablauf().filter(s => !((st[s.ex] || [])[s.i] || {}).done);
+  return ablauf().filter(s => s.art === "aufwaerm"
+    ? !s.erledigt
+    : !((st[s.ex] || [])[s.i] || {}).done);
 }
 /* Die Dauer einer Schrittfolge. Je Schritt: die Zeit des Satzes selbst, dann
    die Pause, die danach faellt. Welche das ist, entscheidet allein der
@@ -5158,6 +5203,24 @@ function viewFokus(){
       + '<div id="restslot"></div></div>';
   }
 
+  /* Waehrend der Pause traegt der Schirm den Countdown und nichts sonst
+     ausser dem, was danach kommt. Das ist die eine Frage, die man in der
+     Pause hat. */
+  if (S.rest && restLeft() > 0) return '<div class="fokus">' + kopf + fokusPause(s) + '</div>';
+
+  if (s.art === "aufwaerm") {
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">'+esc(exName(s.ex))+'</div>'
+      + '<div class="fk-satz">Aufwärmsatz '+(s.i+1)+' · zählt nicht mit</div>'
+      + '<div class="fk-gewicht num">'+kg(s.gewicht)+' kg</div>'
+      + '<div class="fk-ziel">'+s.wdh+' Wiederholungen</div>'
+      + '</div>'
+      + '<div class="fk-fuss">'
+      + '<button class="btn" data-a="warmstufe" data-id="'+s.ex+'" data-i="'+s.i+'">Erledigt</button>'
+      + '</div><div id="restslot"></div></div>';
+  }
+
   const rows = a.sets[s.ex] || [];
   const satz = rows[s.i] || {reps:8, done:false};
   const c = Object.assign({perSide:false, ecc:0, chain:0}, a.cfg[s.ex] || {});
@@ -5199,6 +5262,44 @@ function viewFokus(){
     + '</div>'
     + '<div id="restslot"></div>'
     + '</div>';
+}
+
+/* Der Pausenschirm. Der Countdown wird hier einmal gebaut und danach von
+   `renderRest` nur noch beschriftet — jede Sekunde neu zu erzeugen liesse
+   die Einblendung im Sekundentakt laufen, und genau das war frueher das
+   Flackern. Die Zeichnung der naechsten Uebung steht schon hier, klein und
+   gedaempft unter dem Countdown — man sieht waehrend der Pause, was kommt,
+   ohne dass sie mit der Zahl selbst um Aufmerksamkeit konkurriert. */
+function fokusPause(naechster){
+  const left = restLeft();
+  const txt = Math.floor(left/60) + ":" + String(left%60).padStart(2,"0");
+  let unten = "";
+  if (naechster) {
+    const a = S.active;
+    const c = Object.assign({perSide:false}, a.cfg[naechster.ex] || {});
+    const w = a.weights[naechster.ex];
+    const gew = naechster.art === "aufwaerm"
+      ? kg(naechster.gewicht) + ' kg'
+      : isBw(naechster.ex)
+        ? (w ? '+' + kg(w) + ' kg' : 'Körpergewicht')
+        : kg(w) + ' kg' + (c.perSide ? ' pro Seite' : '');
+    const ziel = naechster.art === "aufwaerm"
+      ? naechster.wdh + ' Wiederholungen'
+      : 'Ziel: ' + naechster.cfg.min + '–' + naechster.cfg.max
+        + (istZeit(naechster.ex) ? ' s' : '');
+    unten = '<div class="fk-danach">'
+      + exIcon(naechster.ex, null, null, "fk-danach-art")
+      + '<div class="fk-danachtitel">Danach: '+esc(exName(naechster.ex))+'</div>'
+      + '<div class="fk-ziel">'+esc(gew)+'</div>'
+      + '<div class="fk-ziel">'+ziel+'</div></div>';
+  }
+  return '<div class="fk-buehne">'
+    + '<div class="fk-count num" id="fkrest">'+txt+'</div>'
+    + '<div class="fk-pauselbl">'+(S.rest && S.rest.wechsel ? 'Übergang' : 'Pause')+'</div>'
+    + unten + '</div>'
+    + '<div class="fk-fuss">'
+    + '<button class="btn ghost" data-a="skiprest">Pause überspringen</button>'
+    + '</div><div id="restslot"></div>';
 }
 
 function setRow(e, s, i){
@@ -5496,6 +5597,20 @@ function ringZeigen(){
 }
 
 function renderRest(){
+  /* Im Fokusmodus traegt der Schirm den Countdown selbst und gross. Der
+     schwebende Balken hat dort nichts verloren — er wuerde dieselbe Zahl ein
+     zweites Mal zeigen. */
+  const fk = document.getElementById("fkrest");
+  if (fk && S.active && S.active.fokus) {
+    restEl.innerHTML = "";
+    const slot = document.getElementById("restslot");
+    if (slot) slot.innerHTML = "";
+    if (!S.rest) { render(); return; }
+    const l = restLeft();
+    const t = Math.floor(l/60) + ":" + String(l%60).padStart(2,"0");
+    if (fk.textContent !== t) fk.textContent = t;
+    return;
+  }
   /* Waehrend einer Einheit gehoert die Pause nach oben zur Kopfzeile: dort
      steht schon alles andere, und beim Scrollen durch die Saetze bleibt sie
      sichtbar. Ohne laufende Einheit bleibt der schwebende Balken unten. */
@@ -5632,6 +5747,14 @@ function tickRest(){
        lange nachdem die Pause vorbei war. */
     if (!pauseNativ()) ton("ende");
     zumNaechstenSatz();
+    /* Im Fokusmodus wechselt die Ansicht von allein weiter — das ist der
+       Kern des gefuehrten Modus: Piep, naechste Uebung, ohne Bedienung.
+       S.rest muss dafuer weg, nicht nur abgelaufen sein: sonst rendert
+       `render()` gleich darauf den naechsten Schirm (Satz oder Aufwaermen,
+       keiner davon kennt `#fkrest`), `renderRest()` faellt zurueck auf den
+       schwebenden Balken und der zeigt "00:00" ueber der naechsten Uebung —
+       eine Pause, die laengst vorbei ist, so als liefe sie noch. */
+    if (S.active && S.active.fokus) { S.rest = null; render(); return; }
   }
   renderRest();
 }
@@ -7886,13 +8009,22 @@ document.addEventListener("click", ev => {
     buzz(11);
     S.active.warm = S.active.warm || {};
     const stufe = +el.dataset.i + 1;
-    S.active.warm[id] = S.active.warm[id] === stufe ? stufe - 1 : stufe;
+    /* Im Fokusmodus zeigt der Schirm immer nur die naechste offene Stufe —
+       ein zweiter Antipp vor dem Fortschreiben (schnelles Doppeltippen) darf
+       sie dann nicht wieder auf 0 zuruecksetzen, es gibt dort keinen
+       "falschen" Chip zum Korrigieren, nur vorwaerts. In der Liste bleibt der
+       Toggle: dort stehen alle Stufen gleichzeitig, und nochmal auf dieselbe
+       hebt einen Vertipper wieder auf (Kommentar oben). */
+    S.active.warm[id] = S.active.fokus
+      ? Math.max(+S.active.warm[id] || 0, stufe)
+      : (S.active.warm[id] === stufe ? stufe - 1 : stufe);
     save();
     const box = document.querySelector('[data-sets="'+id+'"]');
     if (box && box.parentElement) {
       const alt = box.parentElement.querySelector(".warmzeile");
       if (alt) alt.outerHTML = aufwaermZeile(id, S.active.weights[id]);
     }
+    if (S.active.fokus) { render(); return; }
     return;
   }
   if (a === "ps") {
