@@ -1274,10 +1274,17 @@
   /* Ein Bildschirm, drei Zonen: Kopf (klein, orientiert), Buehne (traegt
      alles Wichtige, mittig), Fuss (der eine Knopf, in Daumenreichweite).
      Die Buehne waechst, damit der Knopf immer unten sitzt — egal wie lang
-     der Uebungsname ist. */
+     der Uebungsname ist.
+
+     Die Hoehe zieht `--pad-b` heran, dieselbe Grosse, die `.wrap` fuer sein
+     eigenes unteres Polster benutzt — statt einer eigenen geschaetzten Zahl.
+     Waere .fokus mit `flat` gerendert (kein Riegel unten, siehe render()),
+     steht hier automatisch 44px statt 132px, und die Rechnung bleibt exakt:
+     Kopf-Polster + Buehne + Fuss-Polster ergibt wieder genau die
+     Bildschirmhoehe, unabhaengig davon, welches Polster gerade gilt. */
   .fokus{
     display:flex; flex-direction:column;
-    min-height:calc(100dvh - env(safe-area-inset-top) - 26px);
+    min-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--pad-b, 132px));
   }
   .fokus .fk-kopf{
     display:flex; align-items:center; gap:11px; margin-bottom:8px;
@@ -1303,6 +1310,18 @@
     flex:1; display:flex; flex-direction:column;
     align-items:center; justify-content:center; text-align:center;
     gap:5px; padding:26px 0;
+  }
+  /* Die Zeichnung steht vor dem Namen, als Erstes im Blick — aber gedaempft:
+     sie orientiert ("mach jetzt das"), sie ist kein Schmuck, der mit der
+     Wiederholungszahl um Aufmerksamkeit konkurriert. Die Hoehe ist gedeckelt,
+     nicht fest — auf einem kleinen Schirm bleibt so Platz fuer den Knopf,
+     auf einem grossen wirkt sie nicht verloren. Das Seitenverhaeltnis der
+     Zeichnungen (~3:4) kommt ueber `aspect-ratio`, nicht aus fixen Massen:
+     `exArt`/`exIcon` setzen --w/--h zwar inline, aber `width`/`height` stehen
+     hier in einer spezifischeren Regel und gewinnen unabhaengig davon. */
+  .fokus .fk-art{
+    height:min(32vh, 260px); width:auto; aspect-ratio:3/4;
+    margin:0 auto; color:var(--dim); opacity:1;
   }
   .fokus .fk-uebung{
     font-size:29px; font-weight:700; letter-spacing:-.02em;
@@ -5146,15 +5165,26 @@ function viewFokus(){
   const gewText = isBw(s.ex)
     ? (w ? '+' + kg(w) + ' kg' : 'Körpergewicht')
     : kg(w) + ' kg' + (c.perSide ? ' pro Seite' : '');
+  /* `num` ist fuer dichte Ziffern gedacht (siehe Kommentar am Bestand), nicht
+     fuer Fliesstext. Bei Koerpergewicht ohne Zusatzlast steht dort das Wort
+     "Körpergewicht" — die einzige Stelle, an der `gewText` nicht mit einer
+     Ziffer beginnt. */
+  const gewIstZahl = !isBw(s.ex) || !!w;
   const zielText = s.cfg.total
     ? s.cfg.total[0] + '–' + s.cfg.total[1] + ' gesamt'
     : s.cfg.min + '–' + s.cfg.max + (istZeit(s.ex) ? ' s' : '');
 
   return '<div class="fokus">' + kopf
     + '<div class="fk-buehne">'
+    /* exIcon statt exArt: faellt eine Uebung ohne eigene Zeichnung auf das
+       Piktogramm zurueck, statt eine Luecke zu lassen. Groesse kommt aus der
+       CSS-Klasse (`.fk-art`), nicht aus den w/h-Parametern — die wuerden als
+       fester Pixelwert inline landen und liessen sich dann nicht mehr
+       responsiv deckeln. */
+    + exIcon(s.ex, null, null, "fk-art")
     + '<div class="fk-uebung">'+esc(exName(s.ex))+'</div>'
     + '<div class="fk-satz">Satz '+(s.i+1)+' von '+rows.length+'</div>'
-    + '<div class="fk-gewicht num">'+esc(gewText)+'</div>'
+    + '<div class="fk-gewicht'+(gewIstZahl ? ' num' : '')+'">'+esc(gewText)+'</div>'
     + '<div class="fk-ziel">Ziel: '+zielText+'</div>'
     + '<div class="fk-eingabe">'
     + '<button class="fk-rb" data-a="reps" data-id="'+s.ex+'" data-i="'+s.i+'" data-d="-'+schrittVon(s.ex)+'">'+I.minus+'</button>'
@@ -5419,7 +5449,13 @@ function renderTabs(){
    schwer auffindbare Folgefehler. */
 function render(){
   let html, flat = false;
-  if (S.active) { html = S.active.fokus ? viewFokus() : viewSession(); flat = false; }
+  /* `flat` steuert nur das untere Polster — reserviert fuer die Reiterleiste,
+     die `renderTabs()` waehrend jeder laufenden Einheit ohnehin leert. Ohne
+     `flat` bliebe das Polster einer Leiste stehen, die es hier nicht gibt,
+     und der Fokusschirm liefe ueber den sichtbaren Bereich hinaus. Gilt fuer
+     beide Unteransichten der Einheit gleichermassen — auch die Liste hat
+     waehrend einer Einheit keine Reiterleiste. */
+  if (S.active) { html = S.active.fokus ? viewFokus() : viewSession(); flat = true; }
   else if (route && route.view === "session") { html = viewSessionDetail(route.id); flat = true; }
   else if (route && route.view === "exercise") { html = viewExercise(route.id); flat = true; }
   else if (route && route.view === "planlist") { html = viewPlanList(); flat = true; }
