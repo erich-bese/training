@@ -1270,6 +1270,77 @@
     border:1px solid var(--line); background:var(--card-2); font-size:11.5px; color:var(--muted);
   }
 
+  /* ---- gefuehrter Trainingsmodus ---- */
+  /* Ein Bildschirm, drei Zonen: Kopf (klein, orientiert), Buehne (traegt
+     alles Wichtige, mittig), Fuss (der eine Knopf, in Daumenreichweite).
+     Die Buehne waechst, damit der Knopf immer unten sitzt — egal wie lang
+     der Uebungsname ist. */
+  .fokus{
+    display:flex; flex-direction:column;
+    min-height:calc(100dvh - env(safe-area-inset-top) - 26px);
+  }
+  .fokus .fk-kopf{
+    display:flex; align-items:center; gap:11px; margin-bottom:8px;
+  }
+  .fokus .fk-kopfmitte{flex:1; min-width:0; text-align:center}
+  .fokus .fk-plan{
+    font-size:12.5px; font-weight:640; color:var(--dim);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .fokus .fk-stand{font-size:11.5px; color:var(--muted); margin-top:2px}
+  .fokus .fk-weg,.fokus .fk-um{
+    flex-shrink:0; min-height:38px; padding:0 13px; border-radius:99px;
+    border:1px solid var(--line); background:var(--card-2);
+    color:var(--dim); font-size:12.5px; font-weight:600;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:transform .13s var(--ease);
+  }
+  .fokus .fk-weg{width:38px; padding:0}
+  .fokus .fk-weg:active,.fokus .fk-um:active{transform:scale(.94)}
+  .fokus .fk-weg svg{width:19px; height:19px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round}
+
+  .fokus .fk-buehne{
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    gap:5px; padding:26px 0;
+  }
+  .fokus .fk-uebung{
+    font-size:29px; font-weight:700; letter-spacing:-.02em;
+    line-height:1.1; color:var(--bone);
+  }
+  .fokus .fk-satz{font-size:14px; color:var(--muted); margin-top:3px}
+  .fokus .fk-gewicht{
+    font-size:20px; font-weight:640; color:var(--dim); margin-top:9px;
+  }
+  .fokus .fk-ziel{font-size:14px; color:var(--muted)}
+
+  /* Die Eingabe ist das Einzige, was waehrend des Satzes angefasst wird.
+     Entsprechend gross: die Knoepfe tragen 68 px, damit sie auch mit
+     zittrigen Fingern und einer Hand zu treffen sind. */
+  .fokus .fk-eingabe{
+    display:flex; align-items:center; justify-content:center; gap:19px;
+    margin-top:26px;
+  }
+  .fokus .fk-rb{
+    width:68px; height:68px; border-radius:50%;
+    border:1px solid var(--line); background:var(--card-2);
+    color:var(--dim); display:inline-flex; align-items:center;
+    justify-content:center; transition:transform .13s var(--ease);
+  }
+  .fokus .fk-rb:active{transform:scale(.92)}
+  .fokus .fk-rb svg{width:24px; height:24px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round}
+  .fokus .fk-zahl{
+    min-width:98px; font-size:62px; font-weight:700;
+    letter-spacing:-.03em; line-height:1; color:var(--bone);
+  }
+  .fokus .fk-zahl small{font-size:22px; font-weight:600; color:var(--muted)}
+
+  .fokus .fk-fuss{
+    display:flex; flex-direction:column; gap:9px;
+    padding-bottom:calc(13px + env(safe-area-inset-bottom));
+  }
+  .fokus .fk-fuss .btn{min-height:62px; font-size:16px}
+
   /* ---- motion ---- */
   @keyframes rise{from{transform:translateY(14px); opacity:0} to{transform:none; opacity:1}}
   @keyframes fade{from{opacity:0} to{opacity:1}}
@@ -4907,6 +4978,7 @@ function viewSession(){
   const ringR = 22, circ = 2 * Math.PI * ringR;
 
   let h = '<div class="topbar"><button class="back" data-a="cancel">'+I.left+' Abbrechen</button>'
+    + '<button class="tag" data-a="ansicht">Fokus</button>'
     + '<span class="tag" id="duel">'+duelLabel(cur, ref)+'</span></div>';
 
   /* Beim Scrollen durch die Saetze verschwand bisher alles, woran man sich
@@ -5012,6 +5084,93 @@ function viewSession(){
   h += '<div style="margin-top:22px"><button class="btn" data-a="finish"'+(done?"":" disabled")+'>Training abschließen</button></div>';
   return h;
 }
+
+/* ============================================== gefuehrter Trainingsmodus */
+/* Ein Schirm, eine Frage. Waehrend des Trainings soll nichts zu entscheiden
+   sein ausser: wie viele waren es? Alles andere — welche Uebung, welches
+   Gewicht, wie lange Pause — hat die App vorher schon beantwortet.
+
+   Die Reihenfolge kommt aus `ablauf()`, derselben Liste, die auch die
+   Listenansicht und die Dauerrechnung lesen. Zwei Reihenfolgen waeren zwei
+   Wahrheiten. */
+function fokusSchritt(){
+  if (!S.active) return null;
+  return ablaufOffen()[0] || null;
+}
+function viewFokus(){
+  const a = S.active, plan = planOf(a.plan);
+  const prog = sessionProgress();
+  const s = fokusSchritt();
+
+  let kopf = '<div class="fk-kopf">'
+    + '<button class="fk-weg" data-a="cancel">'+I.left+'</button>'
+    + '<div class="fk-kopfmitte">'
+    + '<div class="fk-plan">'+esc(plan ? plan.title : a.plan)+'</div>'
+    + '<div class="fk-stand">Satz '+Math.min(prog.done+1, prog.total)+' / '+prog.total
+    + (laeuft() ? ' · noch '+sessionLeftMin()+' min' : '')+'</div>'
+    + '</div>'
+    + '<button class="fk-um" data-a="ansicht">Liste</button>'
+    + '</div>';
+
+  /* Vor dem Start: Aufwaermen und der Startknopf. Die Zeitfrage steht hier
+     genauso wie in der Liste — danach ist sie beantwortet. */
+  if (!laeuft()) {
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">'+esc(plan ? plan.title : "")+'</div>'
+      + '<div class="fk-ziel">'+prog.total+' Sätze · rund '+sessionLeftMin()+' min</div>'
+      + '</div>'
+      + '<div class="fk-fuss">'
+      + '<button class="btn" data-a="startnow">Training starten</button>'
+      + '<button class="btn ghost" data-a="warmup">Aufwärmen · 3 min</button>'
+      + '</div>'
+      + '<div id="restslot"></div>'
+      + zeitKarte()
+      + '</div>';
+  }
+
+  /* Alles abgehakt: nur noch abschliessen. */
+  if (!s) {
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">Fertig</div>'
+      + '<div class="fk-ziel">Alle Sätze abgehakt</div></div>'
+      + '<div class="fk-fuss"><button class="btn" data-a="finish">Training abschließen</button></div>'
+      + '<div id="restslot"></div></div>';
+  }
+
+  const rows = a.sets[s.ex] || [];
+  const satz = rows[s.i] || {reps:8, done:false};
+  const c = Object.assign({perSide:false, ecc:0, chain:0}, a.cfg[s.ex] || {});
+  const w = a.weights[s.ex];
+  const gewText = isBw(s.ex)
+    ? (w ? '+' + kg(w) + ' kg' : 'Körpergewicht')
+    : kg(w) + ' kg' + (c.perSide ? ' pro Seite' : '');
+  const zielText = s.cfg.total
+    ? s.cfg.total[0] + '–' + s.cfg.total[1] + ' gesamt'
+    : s.cfg.min + '–' + s.cfg.max + (istZeit(s.ex) ? ' s' : '');
+
+  return '<div class="fokus">' + kopf
+    + '<div class="fk-buehne">'
+    + '<div class="fk-uebung">'+esc(exName(s.ex))+'</div>'
+    + '<div class="fk-satz">Satz '+(s.i+1)+' von '+rows.length+'</div>'
+    + '<div class="fk-gewicht num">'+esc(gewText)+'</div>'
+    + '<div class="fk-ziel">Ziel: '+zielText+'</div>'
+    + '<div class="fk-eingabe">'
+    + '<button class="fk-rb" data-a="reps" data-id="'+s.ex+'" data-i="'+s.i+'" data-d="-'+schrittVon(s.ex)+'">'+I.minus+'</button>'
+    + '<div class="fk-zahl num" id="fkzahl">'+satz.reps+(istZeit(s.ex) ? '<small>s</small>' : '')+'</div>'
+    + '<button class="fk-rb" data-a="reps" data-id="'+s.ex+'" data-i="'+s.i+'" data-d="'+schrittVon(s.ex)+'">'+I.plus+'</button>'
+    + '</div></div>'
+    + '<div class="fk-fuss">'
+    + (istZeit(s.ex)
+        ? '<button class="btn ghost" data-a="uhr" data-id="'+s.ex+'" data-i="'+s.i+'">Stoppuhr</button>'
+        : '')
+    + '<button class="btn" data-a="log" data-id="'+s.ex+'" data-i="'+s.i+'">Satz fertig</button>'
+    + '</div>'
+    + '<div id="restslot"></div>'
+    + '</div>';
+}
+
 function setRow(e, s, i){
   return '<div class="set'+(s.done?" done":"")+'" data-row="'+e.id+':'+i+'">'
     + '<span class="idx">'+(i+1)+'</span><div class="mid">'
@@ -5260,7 +5419,7 @@ function renderTabs(){
    schwer auffindbare Folgefehler. */
 function render(){
   let html, flat = false;
-  if (S.active) { html = viewSession(); flat = false; }
+  if (S.active) { html = S.active.fokus ? viewFokus() : viewSession(); flat = false; }
   else if (route && route.view === "session") { html = viewSessionDetail(route.id); flat = true; }
   else if (route && route.view === "exercise") { html = viewExercise(route.id); flat = true; }
   else if (route && route.view === "planlist") { html = viewPlanList(); flat = true; }
@@ -5270,7 +5429,7 @@ function render(){
   else if (tab === "verlauf") html = viewVerlauf();
   else if (tab === "ziele") html = viewZiele();
   else html = viewMehr();
-  const key = S.active ? "session:" + S.active.plan
+  const key = S.active ? "session:" + S.active.plan + (S.active.fokus ? ":fk" : "")
             : route ? route.view + ":" + (route.id || "")
             : tab;
   setHTML(html, flat, key);
@@ -7039,7 +7198,12 @@ function startSession(id, extra){
      Vorher lief die Uhr, sobald man nur nachsehen wollte, welche Uebungen
      anstehen — im echten Verlauf standen dadurch 186, 128 und 103 Minuten. */
   S.active = {plan:id, extra:(extra||[]).map(m => m.id), startedAt:0,
-              sets:sets, weights:weights, cfg:cf, skipped:{}, zeit:0};
+              sets:sets, weights:weights, cfg:cf, skipped:{}, zeit:0,
+              /* Gefuehrt ist die Voreinstellung: ein Satz auf dem Schirm,
+                 danach fuehrt die App weiter. Die Liste bleibt einen Griff
+                 entfernt — sie traegt Gewichtsvorschlag, Tausch und
+                 "Letztes Mal", was im Fokus keinen Platz haette. */
+              fokus:true};
   S.rest = null;
   keepAwake(true);
   save(); render(); toTop();
@@ -7476,6 +7640,10 @@ document.addEventListener("click", ev => {
   }
   if (a === "startnow") { buzz(14); unlockAudio(); startNow(); return; }
   if (a === "warmup") { buzz(13); unlockAudio(); startWarmup(); return; }
+  if (a === "ansicht") {
+    S.active.fokus = !S.active.fokus;
+    save(); render(); toTop(); return;
+  }
   if (a === "sysinfo") { buzz(); sysSheet(); return; }
   if (a === "healthask") {
     buzz();
@@ -7747,6 +7915,11 @@ document.addEventListener("click", ev => {
     /* innerHTML statt textContent: bei Zeitübungen haengt die Einheit mit im
        Feld, und textContent wuerde sie beim ersten Tippen entfernen. */
     if (row) row.querySelector(".reps").innerHTML = s.reps + (istZeit(id) ? '<small>s</small>' : '');
+    /* Dieselbe Zahl im Fokusschirm: dort gibt es keine Zeile, sondern die
+       eine grosse Zahl. Beide Ansichten koennen offen gewesen sein — welches
+       Element existiert, entscheidet, was aktualisiert wird. */
+    const fk = document.getElementById("fkzahl");
+    if (fk) fk.innerHTML = s.reps + (istZeit(id) ? '<small>s</small>' : '');
     updateSub(cfg); updateDuel(); return;
   }
   if (a === "log") {
@@ -7768,6 +7941,10 @@ document.addEventListener("click", ev => {
     if (s.done) startRest(id);
     updateSub(cfg); updateCount(); updateDuel(); updateBody();
     updateRir(id, cfg);
+    /* Im Fokusmodus traegt der Schirm genau einen Satz. Ist der abgehakt,
+       ist der Schirm ein anderer — anders als in der Liste, wo nur eine
+       Zeile ihre Farbe wechselt. */
+    if (S.active.fokus) { render(); return; }
     return;
   }
   if (a === "addset") {
