@@ -1270,6 +1270,126 @@
     border:1px solid var(--line); background:var(--card-2); font-size:11.5px; color:var(--muted);
   }
 
+  /* ---- gefuehrter Trainingsmodus ---- */
+  /* Ein Bildschirm, drei Zonen: Kopf (klein, orientiert), Buehne (traegt
+     alles Wichtige, mittig), Fuss (der eine Knopf, in Daumenreichweite).
+     Die Buehne waechst, damit der Knopf immer unten sitzt — egal wie lang
+     der Uebungsname ist.
+
+     Die Hoehe zieht `--pad-b` heran, dieselbe Grosse, die `.wrap` fuer sein
+     eigenes unteres Polster benutzt — statt einer eigenen geschaetzten Zahl.
+     Waere .fokus mit `flat` gerendert (kein Riegel unten, siehe render()),
+     steht hier automatisch 44px statt 132px, und die Rechnung bleibt exakt:
+     Kopf-Polster + Buehne + Fuss-Polster ergibt wieder genau die
+     Bildschirmhoehe, unabhaengig davon, welches Polster gerade gilt. */
+  .fokus{
+    display:flex; flex-direction:column;
+    min-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - var(--pad-b, 132px));
+  }
+  .fokus .fk-kopf{
+    display:flex; align-items:center; gap:11px; margin-bottom:8px;
+  }
+  .fokus .fk-kopfmitte{flex:1; min-width:0; text-align:center}
+  .fokus .fk-plan{
+    font-size:12.5px; font-weight:640; color:var(--dim);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .fokus .fk-stand{font-size:11.5px; color:var(--muted); margin-top:2px}
+  .fokus .fk-weg,.fokus .fk-um{
+    flex-shrink:0; min-height:38px; padding:0 13px; border-radius:99px;
+    border:1px solid var(--line); background:var(--card-2);
+    color:var(--dim); font-size:12.5px; font-weight:600;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:transform .13s var(--ease);
+  }
+  .fokus .fk-weg{width:38px; padding:0}
+  .fokus .fk-weg:active,.fokus .fk-um:active{transform:scale(.94)}
+  .fokus .fk-weg svg{width:19px; height:19px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round}
+
+  .fokus .fk-buehne{
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center;
+    gap:5px; padding:26px 0;
+  }
+  /* Die Zeichnung steht vor dem Namen, als Erstes im Blick — aber gedaempft:
+     sie orientiert ("mach jetzt das"), sie ist kein Schmuck, der mit der
+     Wiederholungszahl um Aufmerksamkeit konkurriert. Die Hoehe ist gedeckelt,
+     nicht fest — auf einem kleinen Schirm bleibt so Platz fuer den Knopf,
+     auf einem grossen wirkt sie nicht verloren. Das Seitenverhaeltnis der
+     Zeichnungen (~3:4) kommt ueber `aspect-ratio`, nicht aus fixen Massen:
+     `exArt`/`exIcon` setzen --w/--h zwar inline, aber `width`/`height` stehen
+     hier in einer spezifischeren Regel und gewinnen unabhaengig davon. */
+  .fokus .fk-art{
+    height:min(32vh, 260px); width:auto; aspect-ratio:3/4;
+    margin:0 auto; color:var(--dim); opacity:1;
+  }
+  .fokus .fk-uebung{
+    font-size:29px; font-weight:700; letter-spacing:-.02em;
+    line-height:1.1; color:var(--bone);
+  }
+  .fokus .fk-satz{font-size:14px; color:var(--muted); margin-top:3px}
+  .fokus .fk-gewicht{
+    font-size:20px; font-weight:640; color:var(--dim); margin-top:9px;
+  }
+  .fokus .fk-ziel{font-size:14px; color:var(--muted)}
+  .fokus .fk-hinweis{
+    font-size:13px; color:var(--faint); margin-top:13px;
+    max-width:250px; line-height:1.45;
+  }
+
+  /* Die Eingabe ist das Einzige, was waehrend des Satzes angefasst wird.
+     Entsprechend gross: die Knoepfe tragen 68 px, damit sie auch mit
+     zittrigen Fingern und einer Hand zu treffen sind. */
+  .fokus .fk-eingabe{
+    display:flex; align-items:center; justify-content:center; gap:19px;
+    margin-top:26px;
+  }
+  .fokus .fk-rb{
+    width:68px; height:68px; border-radius:50%;
+    border:1px solid var(--line); background:var(--card-2);
+    color:var(--dim); display:inline-flex; align-items:center;
+    justify-content:center; transition:transform .13s var(--ease);
+  }
+  .fokus .fk-rb:active{transform:scale(.92)}
+  .fokus .fk-rb svg{width:24px; height:24px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round}
+  .fokus .fk-zahl{
+    min-width:98px; font-size:62px; font-weight:700;
+    letter-spacing:-.03em; line-height:1; color:var(--bone);
+  }
+  .fokus .fk-zahl small{font-size:22px; font-weight:600; color:var(--muted)}
+
+  .fokus .fk-fuss{
+    display:flex; flex-direction:column; gap:9px;
+    padding-bottom:calc(13px + env(safe-area-inset-bottom));
+  }
+  .fokus .fk-fuss .btn{min-height:62px; font-size:16px}
+
+  /* Der Countdown: einmal gebaut, danach nur beschriftet (siehe `fokusPause`
+     und `renderRest`). `tabular-nums` haelt die Breite fest, sonst springt
+     die Zahl bei jedem Sekundenwechsel minimal in der Breite. */
+  .fokus .fk-count{
+    font-size:82px; font-weight:700; letter-spacing:-.04em;
+    line-height:1; color:var(--bone); font-variant-numeric:tabular-nums;
+  }
+  .fokus .fk-pauselbl{
+    font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--faint); font-weight:640; margin-top:11px;
+  }
+  .fokus .fk-danach{
+    margin-top:34px; padding-top:19px; border-top:1px solid var(--line);
+    width:100%; max-width:280px;
+  }
+  /* Kleiner als die Zeichnung auf dem Satz-Schirm (`.fk-art`): auf dem
+     Pausenschirm bleibt der Countdown das beherrschende Element, die
+     Zeichnung orientiert nur auf das, was als Naechstes kommt. */
+  .fokus .fk-danach-art{
+    height:min(13vh, 100px); width:auto; aspect-ratio:3/4;
+    margin:0 auto 8px; color:var(--dim); opacity:1;
+  }
+  .fokus .fk-danachtitel{
+    font-size:17px; font-weight:640; color:var(--dim); margin-bottom:5px;
+  }
+
   /* ---- motion ---- */
   @keyframes rise{from{transform:translateY(14px); opacity:0} to{transform:none; opacity:1}}
   @keyframes fade{from{opacity:0} to{opacity:1}}
@@ -1313,7 +1433,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "9.26";
+const APP_VERSION = "10.0";
 
 /* ================================================================== icons */
 const I = {
@@ -1404,7 +1524,7 @@ const EX = {
   legpress:   {name:"Beinpresse",             pat:"legpress", mehr:true, inc:1, rest:150},
   latpull:    {name:"Latzug",                 pat:"vpull", mehr:true, inc:1, rest:120},
   uprow:      {name:"Aufrechtes Rudern",      pat:"uprow", mehr:true, inc:1, rest:90},
-  fly:        {name:"Fliegende am Seil",      pat:"fly",   mehr:true, inc:1, rest:90},
+  fly:        {name:"Butterfly",              pat:"fly",   mehr:true, inc:1, rest:90},
   closegrip:  {name:"Enges Bankdrücken",      pat:"bench", mehr:true, inc:1, rest:150},
   pushup:     {name:"Liegestütze",            pat:"bench", mehr:true, bw:true, inc:1.25, rest:90},
   skull:      {name:"Stirndrücken",           pat:"tri",   mehr:true, inc:1, rest:90},
@@ -1786,13 +1906,13 @@ const DEFAULT_PLANS = {
      die Erschoepfung statt der Kraft — und genau er entscheidet ueber das
      Ziel "Klimmzuege am Stueck". Ein einzelner Satz vorweg stoert die
      Kraftarbeit danach nicht nennenswert. */
-  pullA:{id:"pullA", type:"Pull", title:"Pull · Kraft", ex:[
+  pullA:{id:"pullA", type:"Pull", title:"Pull · Kraft", noSuggest:true, ex:[
     {id:"pullmax",  sets:1, min:1, max:30},
     {id:"pullup",   sets:5, min:3, max:5},
     {id:"row",      sets:4, min:6, max:10},
     {id:"facepull", sets:3, min:12, max:15},
     {id:"curl",     sets:3, min:8, max:12}]},
-  pushA:{id:"pushA", type:"Push", title:"Push · Kraft", ex:[
+  pushA:{id:"pushA", type:"Push", title:"Push · Kraft", noSuggest:true, ex:[
     {id:"bench",    sets:5, min:5, max:8},
     {id:"dips",     sets:4, min:5, max:8},
     {id:"ohp",      sets:3, min:6, max:9},
@@ -1802,13 +1922,13 @@ const DEFAULT_PLANS = {
        Haengen hier am Ende und nicht an den Zugtagen, wo Klimmzuege und
        Kreuzheben ihn ohnehin ausreizen. Sekunden, keine Wiederholungen. */
     {id:"hang",     sets:3, min:30, max:60}]},
-  pullB:{id:"pullB", type:"Pull", title:"Pull · Volumen", ex:[
+  pullB:{id:"pullB", type:"Pull", title:"Pull · Volumen", noSuggest:true, ex:[
     {id:"pullmax",  sets:1, min:1, max:30},
     {id:"pullup",   sets:8, min:2, max:4, total:[28,34]},
     {id:"row1",     sets:4, min:8, max:12},
     {id:"reardelt", sets:3, min:12, max:15},
     {id:"hammer",   sets:3, min:8, max:12}]},
-  pushB:{id:"pushB", type:"Push", title:"Push · Volumen", ex:[
+  pushB:{id:"pushB", type:"Push", title:"Push · Volumen", noSuggest:true, ex:[
     {id:"bench",    sets:4, min:8, max:10},
     {id:"dips",     sets:4, min:6, max:10},
     {id:"incline",  sets:3, min:8, max:10},
@@ -1819,31 +1939,77 @@ const DEFAULT_PLANS = {
      Einheit, einmal das Kreuzheben. Der Unterschied steckt in Saetzen und
      Wiederholungen, nicht in zwei Uebungen namens "leicht" und "schwer" —
      Kreuzheben ist Kreuzheben. */
-  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge", ex:[
+  legsA:{id:"legsA", type:"Beine", title:"Beine · Kniebeuge", noSuggest:true, ex:[
     {id:"squat",    sets:5, min:5, max:8},
     {id:"deadlift", sets:3, min:8, max:10},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben", ex:[
+  legsB:{id:"legsB", type:"Beine", title:"Beine · Kreuzheben", noSuggest:true, ex:[
     {id:"deadlift", sets:4, min:4, max:6},
     {id:"squat",    sets:4, min:8, max:10},
     {id:"bss",      sets:3, min:10, max:10},
     {id:"legcurl",  sets:3, min:10, max:12},
     {id:"calf",     sets:4, min:12, max:15},
     {id:"abs",      sets:3, min:12, max:20}]},
-  /* Für Tage, an denen nur eine Einheit drin ist: je ein Muster pro Richtung.
-     noSuggest: wird nie automatisch empfohlen. In einem Splitplan wuerde er das
-     sonst regelmaessig gewinnen, weil er alle Gruppen trifft. Waehlbar bleibt er. */
-  full:{id:"full", type:"Ganzkörper", title:"Ganzkörper", noSuggest:true, ex:[
-    {id:"squat",    sets:3, min:5, max:8},
-    {id:"bench",    sets:3, min:6, max:9},
-    {id:"pullup",   sets:4, min:3, max:5},
-    {id:"rdl",      sets:3, min:8, max:10},
-    {id:"lateral",  sets:2, min:12, max:15},
-    {id:"abs",      sets:2, min:12, max:20}]}
+  /* Die sechs Splitplaene bleiben waehlbar, werden aber nicht mehr empfohlen.
+     Bei zwei bis drei Einheiten pro Woche saehe jeder von ihnen rechnerisch
+     alle zwei bis drei Wochen einen Reiz — zu selten, um Kraft aufzubauen.
+     Empfohlen wird deshalb nur noch Ganzkoerper A/B. */
+  /* Ganzkoerper A und B. Der Unterschied ist genau eine Uebung: einmal traegt
+     die Kniebeuge die Einheit, einmal das Kreuzheben. Alles andere ist
+     gleich, damit jede Einheit denselben Kern hat und nichts durchs Raster
+     faellt, wenn zwischen zwei Einheiten eine Woche liegt.
+
+     `blk` heisst Wechselblock: Klimmzuege und Dips laufen Satz um Satz im
+     Wechsel, ebenso die beiden Zirkel. Dadurch liegen zwischen zwei
+     Klimmzugsaetzen gut drei Minuten, ohne dass drei Minuten dastehen.
+
+     `prio` ist die Rangfolge beim Kuerzen: 1 bleibt immer, 3 faellt zuerst —
+     und immer der ganze Block, nie ein halber Zirkel. */
+  fullA:{id:"fullA", type:"Ganzkörper", title:"Ganzkörper A · Kniebeuge", ex:[
+    {id:"pullup",   sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    {id:"dips",     sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    {id:"squat",    sets:2, min:6,  max:8,            prio:1},
+    {id:"fly",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"row",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"ohp",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"curl",     sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"pushdown", sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"lateral",  sets:2, min:10, max:15, blk:"ar", prio:3}]},
+  fullB:{id:"fullB", type:"Ganzkörper", title:"Ganzkörper B · Kreuzheben", ex:[
+    {id:"pullup",   sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    {id:"dips",     sets:3, min:6,  max:8,  blk:"kd", prio:1},
+    /* 5 bis 8: `zielWdh` ergibt 6,5 und liegt damit genau auf `WDH_TOLERANZ`
+       zum schweren Beintag (4–6, also 5). Die beiden Bereiche gelten deshalb
+       als derselbe. Entschaerft ist das durch den Import vom 17.08.: der ist
+       der neueste passende Eintrag, und `passendesLetztes` nimmt den
+       neuesten. Wer hier den Bereich aendert, prueft das erneut. */
+    {id:"deadlift", sets:2, min:5,  max:8,            prio:1},
+    {id:"fly",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"row",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"ohp",      sets:2, min:8,  max:10, blk:"ob", prio:2},
+    {id:"curl",     sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"pushdown", sets:2, min:8,  max:12, blk:"ar", prio:3},
+    {id:"lateral",  sets:2, min:10, max:15, blk:"ar", prio:3}]}
 };
+/* Der Sammelplan "full" ist mit 10.0 aus DEFAULT_PLANS gefallen. Wer beim
+   Umstieg gerade eine Einheit damit laufen hatte, muss sie trotzdem mit
+   ihren ursprünglichen Übungen zu Ende bringen können — sonst wirft jede
+   Stelle, die für die laufende Einheit `planOf(a.plan)` aufruft (Kopfzeile,
+   Übungsliste, Tausch, Abschluss), einen TypeError, sobald der neue Code
+   aktiv wird. Diese Kopie dient ausschließlich diesem Rückfall: Sie taucht
+   nirgends in `plans()`/`DEFAULT_PLANS` auf und ist deshalb weder wählbar
+   noch empfohlen — `planOf` reicht sie nur genau dann heraus, wenn sonst
+   nichts unter "full" zu finden ist. */
+const PLAN_FULL_LEGACY = {id:"full", type:"Ganzkörper", title:"Ganzkörper", noSuggest:true, ex:[
+  {id:"squat",    sets:3, min:5, max:8},
+  {id:"bench",    sets:3, min:6, max:9},
+  {id:"pullup",   sets:4, min:3, max:5},
+  {id:"rdl",      sets:3, min:8, max:10},
+  {id:"lateral",  sets:2, min:12, max:15},
+  {id:"abs",      sets:2, min:12, max:20}]};
 const DEFAULT_WEIGHTS = {
   pullup:0, row:40, row1:25, facepull:20, reardelt:25, curl:12, hammer:25,
   bench:40, incline:30, dips:0, ohp:25, lateral:8, triceps:15, pushdown:15,
@@ -1975,6 +2141,7 @@ const EMPTY = () => ({
      einer Woche. */
   healthLog:[],
   griffNachgetragen:false,/* einmaliges Nachtragen des Haengens in eigene Plaene */
+  ganzkoerperNachgetragen:false,/* einmaliges Nachtragen von fullA/fullB in eigene Plaene */
   settings:{bodyweight:80, rest:120, sound:true, plates:[1.25, 2.5, 5], eccMax:10}
 });
 
@@ -2039,6 +2206,24 @@ function migrate(d){
   }
   out.griffNachgetragen = true;
 
+  /* Wer seine Plaene schon bearbeitet hat, hat eine eigene Kopie — die kennt
+     die Ganzkoerperplaene nicht, und ohne diesen Schritt taucht die neue
+     Voreinstellung bei ihm nie auf. Genau einmal, und nur was fehlt: nimmt er
+     sie wieder heraus, bleiben sie draussen. */
+  if (out.plans && !out.ganzkoerperNachgetragen) {
+    ["fullA", "fullB"].forEach(pid => {
+      if (!out.plans[pid]) out.plans[pid] = JSON.parse(JSON.stringify(DEFAULT_PLANS[pid]));
+    });
+    /* Der alte Sammelplan geht in Ganzkoerper A auf. Gespeicherte Einheiten
+       mit `plan:"full"` bleiben unangetastet im Verlauf — sie tragen ihren
+       Typ selbst. */
+    delete out.plans.full;
+    ["pullA","pushA","pullB","pushB","legsA","legsB"].forEach(pid => {
+      if (out.plans[pid]) out.plans[pid].noSuggest = true;
+    });
+  }
+  out.ganzkoerperNachgetragen = true;
+
   out.sessions = (Array.isArray(d.sessions) ? d.sessions : []).map(s => ({
     id: s.id || String(Math.round(Math.random()*1e9)),
     date: s.date, plan: s.plan, type: s.type,
@@ -2087,7 +2272,11 @@ function save(){
 
 /* plans: defaults unless the user edited them */
 const plans = () => S.plans || DEFAULT_PLANS;
-const planOf = id => plans()[id];
+/* "full" faellt hier zurueck auf `PLAN_FULL_LEGACY`, wenn plans() nichts
+   liefert — damit kommt eine noch laufende Alt-Einheit ueber den Umstieg,
+   ohne dass "full" irgendwo waehlbar wieder auftaucht: `plans()` selbst
+   kennt den Schluessel nicht mehr, nur dieser gezielte Rueckfall. */
+const planOf = id => plans()[id] || (id === "full" ? PLAN_FULL_LEGACY : undefined);
 function editablePlans(){
   if (!S.plans) S.plans = JSON.parse(JSON.stringify(DEFAULT_PLANS));
   return S.plans;
@@ -2137,6 +2326,16 @@ const uebergangDauer = voll => Math.max(45, Math.min(90, Math.round((+voll || 0)
    eine Anleitung, kein Teil der Einheit. */
 const AUFWAERM_STUFEN = [[0.4, 8], [0.6, 5], [0.8, 3]];
 const AUFWAERM_MIN = 20;   /* darunter lohnt kein Aufbau — dann direkt los */
+/* Der Uebergang zwischen zwei Aufwaermstufen — und in den ersten
+   Arbeitssatz hinein, ebenfalls: davor will man frisch sein, aber ein Satz
+   auf 80 Prozent ermuedet kaum, und die volle Pause der Uebung (180 s bei
+   Kreuzheben) waere dafuer masslos ueberzogen. 60 Sekunden reichen fuers
+   Umstellen — am Geraet die Stufe, an der Langhantel die Scheiben — und
+   treffen mit drei Stufen plus Uebergaengen rechnerisch die veranschlagten
+   ~5 Minuten Aufwaermzeit fast genau (3 Saetze + 3 Uebergaenge ≈ 288 s).
+   `folgeDauer` und `startRest` rechnen beide mit dieser einen Zahl, sonst
+   zeigt der Kopf eine andere Restzeit an, als tatsaechlich ablaeuft. */
+const AUFWAERM_UEBERGANG_S = 60;
 
 function aufwaermPlan(exId, gewicht){
   if (restFor(exId) < 180) return null;
@@ -3159,6 +3358,20 @@ function weekAhead(){
   return tage;
 }
 
+/* Der zuletzt trainierte Ganzkoerperplan. Nicht der zuletzt *geoeffnete* —
+   nur Einheiten mit Saetzen zaehlen, sonst dreht ein versehentliches Oeffnen
+   die Reihenfolge um. */
+function letzterGanzkoerper(){
+  for (let i = S.sessions.length - 1; i >= 0; i--) {
+    const s = S.sessions[i];
+    if (s.kind !== "lift") continue;
+    if (s.plan !== "fullA" && s.plan !== "fullB") continue;
+    if (!(s.entries || []).some(e => (e.reps || []).length)) continue;
+    return s.plan;
+  }
+  return null;
+}
+
 function recommend(){
   const st = muscleState();
   const by = muscleMap(st);
@@ -3166,6 +3379,17 @@ function recommend(){
   const lvl = form ? form.level : null;
 
   const sys = systemLoad();
+
+  /* Gemeinsamer Tagesform-Hinweis: gilt fuer den regulaeren Vorschlag genauso
+     wie fuer den A/B-Wechsel weiter unten, deshalb hier einmal berechnet statt
+     zweimal hingeschrieben. Ohne die Aufzaehlung der Gruende: die stehen einen
+     Tipp entfernt im Nervensystem-Blatt, und die Erholung steht als Zahl schon
+     oben im Kopf. Hier zaehlt nur, was das fuer die naechste Stunde heisst. */
+  const hint = lvl === "gelb"
+    ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
+    : sys.level === "erhoeht"
+    ? "Erhöhte Grundbelastung. Heute nicht bis ans Muskelversagen."
+    : null;
 
   if (lvl === "rot") {
     return {kind:"rest", level:lvl, form:form, state:st, sys:sys,
@@ -3181,6 +3405,22 @@ function recommend(){
       why:"Mehrere Zeichen sprechen für eine Pause: " + sys.gruende.join(", ") + ". "
         + "Das Nervensystem trägt alles zusammen, nicht je Muskelgruppe — "
         + "ein Tag Pause bringt hier mehr als eine weitere Einheit."};
+  }
+
+  /* Ganzkoerper A und B wechseln sich ab, und zwar hart: die App merkt sich,
+     was zuletzt dran war, und nimmt das andere. Ueber die Punktebewertung
+     ginge das auch ungefaehr — A und B treffen fast dieselben Muskeln, also
+     entschiede der Rueckstand. "Ungefaehr" ist hier aber zu wenig: wer
+     zweimal hintereinander Kniebeuge bekommt, hat vier Wochen kein
+     Kreuzheben gemacht. */
+  const ganz = letzterGanzkoerper();
+  if (ganz && planOf(ganz === "fullB" ? "fullA" : "fullB")) {
+    const pid = ganz === "fullB" ? "fullA" : "fullB";
+    return {kind:"plan", planId:pid, level:lvl, form:form, state:st, sys:sys,
+      why:"Zuletzt " + (ganz === "fullB" ? "Kreuzheben" : "Kniebeuge")
+        + " — heute ist " + (pid === "fullA" ? "die Kniebeuge" : "das Kreuzheben")
+        + " dran. Der Rest der Einheit bleibt gleich.",
+      hint: hint};
   }
 
   const lastLift = S.sessions.slice().reverse().find(s => s.kind === "lift");
@@ -3222,14 +3462,7 @@ function recommend(){
   return {
     kind:"plan", planId:best.pid, level:lvl, form:form, state:st, sys:sys,
     why:reasonFor(best.pid, st, istAeltester),
-    hint: lvl === "gelb"
-      ? "Tagesform gedämpft: einen Satz weniger pro Übung und nicht bis ans Muskelversagen."
-      /* Ohne die Aufzaehlung: die Gruende stehen einen Tipp entfernt im
-         Nervensystem-Blatt, und die Erholung steht als Zahl schon oben im
-         Kopf. Hier zaehlt nur, was das fuer die naechste Stunde heisst. */
-      : sys.level === "erhoeht"
-      ? "Erhöhte Grundbelastung. Heute nicht bis ans Muskelversagen."
-      : null
+    hint: hint
   };
 }
 
@@ -3690,32 +3923,106 @@ function silhouette(st, kompakt){
     + '</div></details>';
 }
 
-/* Geschaetzte Dauer einer Uebungsfolge in Sekunden.
-   Je Satz rund 20 Sekunden Vorbereitung plus drei Sekunden je Wiederholung.
-   Danach die Pause — die volle, solange in derselben Uebung noch ein Satz
-   folgt, sonst der kuerzere Uebergang; nach dem letzten Satz der Einheit gar
-   keine. Genau so laeuft es auch wirklich ab, siehe `restArt`. Vorher stand
-   hier die volle Pause nach jedem Satz, was die Uebergaenge um bis zu
-   anderthalb Minuten je Uebung zu lang schaetzte.
+/* ================================================= Ablauf einer Einheit */
+/* Die flache, geordnete Schrittliste — die einzige Quelle fuer Reihenfolge,
+   Pausenart und Dauer. Fokusmodus und Listenansicht lesen dieselbe Liste,
+   sonst laufen sie auseinander.
 
-   Der Wert ist ein Sollwert, kein Mittel aus dem Verlauf — der Verlauf
-   enthaelt genau die Handypausen, die hier vermieden werden sollen.
+   `blk` macht aus mehreren Programmpunkten einen Wechselblock: Runde fuer
+   Runde je ein Satz, statt alle Saetze einer Uebung am Stueck. Sind die
+   Satzzahlen ungleich, laeuft der Block weiter, bis die laengste Reihe durch
+   ist — erschoepfte Uebungen fallen in der Runde einfach aus. */
+/* Die Aufwaermstufen einer Uebung als Ablaufschritte. Nur bei den schweren
+   Grunduebungen (`aufwaermPlan` prueft das selbst ueber die Pausendauer) und
+   nur, solange noch kein Arbeitssatz steht — danach sind sie erledigt.
+   Sie zaehlen ausdruecklich nicht in die Satzzahl, nicht ins Volumen und
+   nicht in die Erholungsrechnung; gespeichert wird von ihnen nichts. */
+function warmSchritte(exId){
+  if (!S.active) return [];
+  const rows = S.active.sets[exId] || [];
+  if (rows.some(s => s.done)) return [];
+  const plan = aufwaermPlan(exId, S.active.weights[exId]);
+  if (!plan) return [];
+  const fertig = (S.active.warm || {})[exId] || 0;
+  return plan.map((st, k) => ({art:"aufwaerm", ex:exId, i:k,
+                               gewicht:st.gewicht, wdh:st.wdh, erledigt:k < fertig}));
+}
+function ablauf(plan, sets){
+  /* Ohne Argumente: die laufende Einheit. Mit Plan: der volle Umfang, wie ihn
+     `planDuration` fuer die Vorschau braucht. */
+  const ausAktiv = !plan;
+  const liste = ausAktiv ? activeExList() : (plan.ex || []);
+  const stand = ausAktiv ? (S.active.sets || {}) : (sets || null);
+  const uebersprungen = ausAktiv ? (S.active.skipped || {}) : {};
 
-   Eine Stelle fuer drei Fragen: wie lange dauert der Plan, wie lange noch,
-   und was passt in die Zeit, die heute da ist. Laufen die auseinander,
-   widerspricht die App sich selbst in derselben Ansicht. */
-function folgeDauer(liste){
-  const echt = liste.filter(x => x.saetze > 0);
+  const satzZahl = e => {
+    if (stand && stand[e.id]) return stand[e.id].length;
+    return Math.max(1, +e.sets || 3);
+  };
+
+  const schritte = [];
+  let i = 0;
+  while (i < liste.length) {
+    const e = liste[i];
+    if (uebersprungen[e.id]) { i++; continue; }
+    if (!e.blk) {
+      if (ausAktiv) warmSchritte(e.id).forEach(x => schritte.push(x));
+      for (let k = 0; k < satzZahl(e); k++)
+        schritte.push({art:"satz", ex:e.id, i:k, cfg:e});
+      i++;
+      continue;
+    }
+    /* Alle unmittelbar folgenden Punkte mit derselben Blockkennung
+       einsammeln. Bewusst nur zusammenhaengend: ein Block, der im Plan
+       auseinandergerissen steht, waere ein Fehler im Plan und soll nicht
+       stillschweigend wieder zusammengezogen werden. */
+    const blk = [];
+    while (i < liste.length && liste[i].blk === e.blk) {
+      if (!uebersprungen[liste[i].id]) blk.push(liste[i]);
+      i++;
+    }
+    if (ausAktiv) blk.forEach(x => warmSchritte(x.id).forEach(y => schritte.push(y)));
+    const runden = blk.reduce((m, x) => Math.max(m, satzZahl(x)), 0);
+    for (let r = 0; r < runden; r++)
+      blk.forEach(x => {
+        if (r < satzZahl(x)) schritte.push({art:"satz", ex:x.id, i:r, cfg:x});
+      });
+  }
+  return schritte;
+}
+/* Nur was noch aussteht. Grundlage fuer Pausenart, Restzeit und den Sprung
+   nach der Pause. */
+function ablaufOffen(){
+  if (!S.active) return [];
+  const st = S.active.sets || {};
+  return ablauf().filter(s => s.art === "aufwaerm"
+    ? !s.erledigt
+    : !((st[s.ex] || [])[s.i] || {}).done);
+}
+/* Die Dauer einer Schrittfolge. Je Schritt: die Zeit des Satzes selbst, dann
+   die Pause, die danach faellt. Welche das ist, entscheidet allein der
+   naechste Schritt — dieselbe Uebung heisst volle Pause, eine andere den
+   kuerzeren Uebergang, kein naechster Schritt gar keine. Kommt der Schritt
+   selbst aus dem Aufwaermen, gilt das nicht: dann ist es immer der kurze
+   Aufwaerm-Uebergang, auch wenn danach derselbe Arbeitssatz folgt — eine
+   volle Pause waere fuer einen Satz auf 40 oder 80 Prozent des Gewichts
+   masslos ueberzogen.
+
+   Vorher rechnete diese Funktion je Uebung und setzte damit voraus, dass
+   alle Saetze einer Uebung am Stueck laufen. Mit Wechselsaetzen stimmt das
+   nicht mehr, und die Zahl waere um Minuten daneben. */
+function folgeDauer(schritte){
   let sek = 0;
-  echt.forEach((x, i) => {
-    const n = x.saetze;
-    const wdh = +x.wdh || 8;
-    /* Bei Zeituebungen ist die Zahl schon die Dauer — sie mit drei Sekunden je
-       Wiederholung zu multiplizieren machte aus einem Satz Haengen zwei
+  (schritte || []).forEach((s, i) => {
+    const wdh = +s.wdh || (s.cfg ? planWdh(s.cfg) : 8);
+    /* Bei Zeituebungen ist die Zahl schon die Dauer — sie mit drei Sekunden
+       je Wiederholung zu multiplizieren machte aus einem Satz Haengen zwei
        Minuten. */
-    sek += n * (20 + (istZeit(x.id) ? wdh : wdh * 3));
-    sek += (n - 1) * restFor(x.id);
-    if (i < echt.length - 1) sek += uebergangDauer(restFor(x.id));
+    sek += 20 + (istZeit(s.ex) ? wdh : wdh * 3);
+    const n = schritte[i + 1];
+    if (!n) return;
+    sek += s.art === "aufwaerm" && n.ex === s.ex ? AUFWAERM_UEBERGANG_S
+         : n.ex === s.ex ? restFor(s.ex) : uebergangDauer(restFor(s.ex));
   });
   return sek;
 }
@@ -3725,15 +4032,12 @@ function planWdh(e){
   return e.total ? Math.round((e.total[0] + e.total[1]) / 2 / n)
                  : ((+e.min || 8) + (+e.max || 10)) / 2;
 }
-const planFolge = liste => (liste || []).map(e =>
-  ({id:e.id, saetze:Math.max(1, +e.sets || 3), wdh:planWdh(e)}));
 
 function planDuration(pid){
   const pl = planOf(pid);
   if (!pl) return {minuten:0, saetze:0};
-  const folge = planFolge(pl.ex);
-  return {minuten: Math.round(folgeDauer(folge) / 60),
-          saetze: folge.reduce((a, x) => a + x.saetze, 0)};
+  const schritte = ablauf(pl);
+  return {minuten: Math.round(folgeDauer(schritte) / 60), saetze: schritte.length};
 }
 
 function viewHeute(){
@@ -4524,13 +4828,13 @@ function sessionBodyState(){
    Ausgefallene Uebungen zaehlen nicht mit — sie finden nicht statt, und
    solange sie mitzaehlten, sank die Restzeit beim Streichen nie. */
 function sessionLeftMin(){
-  const a = S.active;
-  const liste = activeExList().filter(e => !(a.skipped || {})[e.id]).map(e => {
-    const offen = (a.sets[e.id] || []).filter(s => !s.done);
-    return {id:e.id, saetze:offen.length,
-            wdh: offen.length ? offen.reduce((x,s) => x + (+s.reps || 8), 0) / offen.length : 0};
-  });
-  return Math.max(0, Math.round(folgeDauer(liste) / 60));
+  if (!S.active) return 0;
+  const st = S.active.sets || {};
+  /* Die eingestellte Wiederholungszahl des offenen Satzes, nicht die des
+     Plans: wer den Steller heruntergedreht hat, meint das auch so. */
+  const offen = ablaufOffen().map(s =>
+    Object.assign({}, s, {wdh: +((st[s.ex] || [])[s.i] || {}).reps || 8}));
+  return Math.max(0, Math.round(folgeDauer(offen) / 60));
 }
 
 /* =============================================== Zeitbudget einer Einheit */
@@ -4544,36 +4848,51 @@ function sessionLeftMin(){
    Die App entscheidet das nicht heimlich: sie zeigt, was wegfaellt, und der
    volle Umfang ist immer einen Griff entfernt.
 
-   Wichtig oder nicht wird an der Pausendauer abgelesen. Die steht ohnehin je
-   Uebung fest und ist bereits genau diese Einordnung — 180 Sekunden beim
-   Kreuzheben, 45 beim Bauch. Eine zweite Liste danebenzustellen hiesse,
-   dieselbe Aussage an zwei Stellen zu pflegen und sie irgendwann
-   auseinanderlaufen zu lassen. */
-const ZEIT_STUFEN = [30, 45, 60];
+   Wichtig oder nicht wurde bisher an der Pausendauer abgelesen. Fuer die
+   Splitplaene stimmt das noch — dort bleibt es der Rueckfall. Bei den
+   Ganzkoerperplaenen aber traegt Rudern 120 Sekunden, weil der Ruecken sie
+   braucht, nicht weil es wichtiger waere als die Kniebeuge. Dort gilt jetzt
+   die Rangfolge, die am Programmpunkt selbst steht: `prio`. */
+const ZEIT_STUFEN = [20, 30, 40];
 const ZEIT_GRUND = "Keine Zeit";      /* einer der SKIP_REASONS, bewusst */
 /* Ab dieser Pausendauer gilt eine Uebung als tragend: Klimmzuege, Rudern,
-   Kreuzheben, Kniebeuge, Bank, Dips, Schulterdruecken, Split Squats. */
+   Kreuzheben, Kniebeuge, Bank, Dips, Schulterdruecken, Split Squats.
+   Rueckfall fuer Plaene ohne `prio` — die sechs Splitplaene und selbst
+   bearbeitete Kopien. */
 const KERN_PAUSE = 120;
 const istKern = id => restFor(id) >= KERN_PAUSE;
+const prioVon = e => +e.prio || (istKern(e.id) ? 1 : 3);
 /* Untergrenzen beim Kuerzen. Ein einzelner Satz ist kein Training; die erste
    Uebung der Einheit traegt sie und behaelt drei. */
 const MIN_SAETZE = 2;
 const MIN_SAETZE_ERSTE = 3;
 
-/* Der volle Umfang der Einheit, unabhaengig davon, was schon gestrichen ist.
-   Gerechnet wird mit denselben Wiederholungen und Satzzahlen, die auch
-   `sessionLeftMin` sieht — sonst stuende auf dem einen Knopf "53 min" und
-   zwei Zeilen darunter "rund 54 min" fuer dieselbe Einheit. */
+/* Der volle Umfang eines Programmpunkts: mindestens die Planzahl, aber nie
+   weniger als das, was in dieser Einheit schon eingetragen ist. Genutzt von
+   `zeitPlan` beim Kuerzen und von `vollDauerMin`, das daraus ein plan-
+   aehnliches Objekt baut — nur so bleibt der volle Umfang stabil, auch wenn
+   zwischenzeitlich schon gestrichen wurde. */
 const vollSaetze = e => Math.max(Math.max(1, +e.sets || 3),
                                  ((S.active && S.active.sets[e.id]) || []).length);
 function vollWdh(e){
   const rows = (S.active && S.active.sets[e.id]) || [];
   return rows.length ? rows.reduce((x,s) => x + (+s.reps || 8), 0) / rows.length : planWdh(e);
 }
+/* Der volle Umfang der Einheit, unabhaengig davon, was schon gestrichen ist —
+   weder eine bereits angewandte Zeitbudget-Kuerzung noch eine gestrichene
+   Uebung duerfen den Wert veraendern. `ablauf()` ohne Argumente sieht genau
+   diese beiden Dinge, waere hier also falsch: es laese die Kuerzung mitzaehlen
+   und gestrichene Uebungen wegfallen. Stattdessen der Plan-Zweig von
+   `ablauf(plan)` auf ein aus `activeExList()` gebautes Objekt mit den vollen
+   Satzzahlen — derselbe Zweig, den `planDuration` fuer einen gespeicherten
+   Plan nimmt, nur mit `vollSaetze` statt der Planzahl. Die Blockstruktur
+   (`blk`) bleibt dabei erhalten, weil sie am Programmpunkt selbst haengt. */
 function vollDauerMin(){
   if (!S.active) return 0;
-  return Math.round(folgeDauer(activeExList().map(e =>
-    ({id:e.id, saetze:vollSaetze(e), wdh:vollWdh(e)}))) / 60);
+  const voll = {ex: activeExList().map(e => Object.assign({}, e, {sets: vollSaetze(e)}))};
+  const schritte = ablauf(voll).map(s =>
+    Object.assign({}, s, {wdh: vollWdh({id: s.ex})}));
+  return Math.round(folgeDauer(schritte) / 60);
 }
 
 /* Was in die vorhandene Zeit passt. Rechnet nur, aendert nichts. */
@@ -4582,51 +4901,51 @@ function zeitPlan(minuten){
   if (!a) return null;
   const budget = Math.max(5, +minuten || 0) * 60;
   const liste = activeExList().map((e, i) => ({
-    id:e.id, i:i, voll:vollSaetze(e), saetze:vollSaetze(e), wdh:vollWdh(e), kern:istKern(e.id)
+    id:e.id, i:i, blk:e.blk || null, prio:prioVon(e),
+    voll:vollSaetze(e), saetze:vollSaetze(e), wdh:vollWdh(e)
   }));
-  const dauer = () => folgeDauer(liste);
+  /* Gerechnet wird ueber denselben Ablauf wie ueberall sonst — sonst stuende
+     auf dem Knopf eine andere Zahl als zwei Zeilen darunter. `wdh` wird nach
+     dem Bauen der Schritte gezielt nachgetragen: `ablauf()` kennt nur `cfg`,
+     und `folgeDauer` faellt ohne `wdh` auf den Plan-Mittelwert zurueck — das
+     waere fuer Haengen (Sekunden statt Wiederholungen) und fuer bereits
+     eingetragene Saetze die falsche Zahl. */
+  const dauer = () => folgeDauer(ablauf(
+    {ex: liste.filter(x => x.saetze > 0).map(x =>
+      Object.assign({}, x, {sets:x.saetze}))},
+    null).map(s => Object.assign({}, s, {wdh: vollWdh({id: s.ex})})));
 
-  /* 1. Nebenuebungen streichen, von hinten. Die Reihenfolge im Plan ist seine
-        eigene Rangfolge — was ihm wichtiger ist, steht weiter vorn. Nach der
-        Pausendauer zu sortieren waere naheliegend, faellt aber falsch aus:
-        das Haengen traegt 90 Sekunden, weil die Sehne Zeit braucht, nicht
-        weil es wichtiger waere als Seitheben. */
+  /* 1. Von hinten streichen, Stufe fuer Stufe — und immer den ganzen Block.
+        Ein halber Zirkel ist kein Zirkel: wer Butterfly und Rudern macht und
+        Schulterdruecken weglaesst, hat den Zirkel nicht gekuerzt, sondern
+        kaputtgemacht. Prio 1 wird hier nie ganz gestrichen. */
   const weg = [];
-  const kandidaten = liste.filter(x => !x.kern).sort((p, q) => q.i - p.i);
-  for (const k of kandidaten) {
-    if (dauer() <= budget) break;
-    k.saetze = 0;
-    weg.push(k.id);
-  }
+  [3, 2].forEach(stufe => {
+    const gruppen = [];
+    liste.filter(x => x.prio === stufe && x.saetze > 0).forEach(x => {
+      const g = gruppen.find(y => y.blk && y.blk === x.blk);
+      if (g) g.teile.push(x); else gruppen.push({blk:x.blk, teile:[x]});
+    });
+    gruppen.sort((p, q) => q.teile[0].i - p.teile[0].i);
+    for (const g of gruppen) {
+      if (dauer() <= budget) return;
+      g.teile.forEach(x => { x.saetze = 0; weg.push(x.id); });
+    }
+  });
 
-  /* 2. Reicht das nicht, Saetze kuerzen. Immer dort, wo gerade die meisten
-        stehen — sonst schrumpft die letzte Uebung auf zwei, waehrend vorn
-        noch fuenf stehen. */
+  /* 2. Reicht das nicht, Saetze bei Prio 1 kuerzen — Prio 2 und 3 sind an
+        dieser Stelle entweder ganz drin oder ganz raus, da wird nichts mehr
+        angefasst. Immer dort kuerzen, wo gerade die meisten Saetze stehen —
+        sonst schrumpft die letzte Uebung auf zwei, waehrend vorn noch fuenf
+        stehen. */
   let sicher = 0;
   while (dauer() > budget && sicher++ < 300) {
     const k = liste
-      .filter(x => x.saetze > (x.i === 0 ? MIN_SAETZE_ERSTE : MIN_SAETZE))
+      .filter(x => x.prio === 1
+        && x.saetze > (x.i === 0 ? MIN_SAETZE_ERSTE : MIN_SAETZE))
       .sort((p, q) => q.saetze - p.saetze || q.i - p.i)[0];
     if (!k) break;
     k.saetze--;
-  }
-
-  /* 3. Was jetzt doch noch in die Zeit passt, kommt zurueck — notfalls mit
-        weniger Saetzen. Ohne diesen Schritt landete eine Einheit bei 40
-        Minuten, obwohl 45 da waren: gestrichen wird in ganzen Uebungen, und
-        die letzte davon hat oft mehr Platz genommen als noetig. Zurueck kommt
-        zuerst die wichtigste der gestrichenen — gestrichen wurde von hinten,
-        also ist das die zuletzt gestrichene. */
-  for (let k = weg.length - 1; k >= 0; k--) {
-    const x = liste.find(y => y.id === weg[k]);
-    if (!x) continue;
-    let n = 0;
-    while (n < x.voll) {
-      x.saetze = n + 1;
-      if (dauer() > budget) { x.saetze = n; break; }
-      n = x.saetze;
-    }
-    if (x.saetze >= MIN_SAETZE) weg.splice(k, 1); else x.saetze = 0;
   }
 
   return {liste:liste, weg:weg, minuten:Math.round(dauer() / 60),
@@ -4678,6 +4997,9 @@ function zeitKarte(){
   const a = S.active;
   const voll = vollDauerMin();
   const gewaehlt = +a.zeit || 0;
+  /* Der kleinste Modus landet bei rund 22 Minuten und nicht darunter — die
+     Untergrenzen lassen drei Klimmzug-, zwei Dip- und zwei Kreuzhebesaetze
+     stehen. Das steht so da, statt auf 20 heruntergerechnet zu werden. */
   const stufen = ZEIT_STUFEN.filter(m => m < voll - 4);
 
   const weg = activeExList().filter(e => ((a.skipped || {})[e.id] || {}).auto).map(e => e.id);
@@ -4745,6 +5067,7 @@ function viewSession(){
   const ringR = 22, circ = 2 * Math.PI * ringR;
 
   let h = '<div class="topbar"><button class="back" data-a="cancel">'+I.left+' Abbrechen</button>'
+    + '<button class="tag" data-a="ansicht">Fokus</button>'
     + '<span class="tag" id="duel">'+duelLabel(cur, ref)+'</span></div>';
 
   /* Beim Scrollen durch die Saetze verschwand bisher alles, woran man sich
@@ -4850,6 +5173,252 @@ function viewSession(){
   h += '<div style="margin-top:22px"><button class="btn" data-a="finish"'+(done?"":" disabled")+'>Training abschließen</button></div>';
   return h;
 }
+
+/* ============================================== gefuehrter Trainingsmodus */
+/* Ein Schirm, eine Frage. Waehrend des Trainings soll nichts zu entscheiden
+   sein ausser: wie viele waren es? Alles andere — welche Uebung, welches
+   Gewicht, wie lange Pause — hat die App vorher schon beantwortet.
+
+   Die Reihenfolge kommt aus `ablauf()`, derselben Liste, die auch die
+   Listenansicht und die Dauerrechnung lesen. Zwei Reihenfolgen waeren zwei
+   Wahrheiten. */
+function fokusSchritt(){
+  if (!S.active) return null;
+  return ablaufOffen()[0] || null;
+}
+/* Das Tagesziel bei den Klimmzuegen. Zwanzig saubere Wiederholungen pro
+   Einheit — eine Zahl, die man im Kopf behaelt, und die unabhaengig davon
+   gilt, ob die Saetze 8/7/5 oder 7/7/6 waren.
+
+   Der Zusatzsatz laeuft als `pullmax`, nicht als vierter `pullup`-Satz. Das
+   loest drei Dinge auf einmal: das Ziel "Strikte Klimmzuege" bekommt wieder
+   Werte (mit 6–8 kaeme es nie ueber Etappe 8), die Regel "alle Saetze im
+   Ziel" bleibt unberuehrt (`evaluate` laeuft ueber `plan.ex`, und dort steht
+   `pullmax` nicht), und die Uebung gibt es schon samt Zeichnung. */
+const KLIMM_TAGESZIEL = 20;
+/* Der Programmpunkt "Klimmzuege" kann fuer diese Einheit getauscht sein
+   (`tauscheUebung`, "Gegen andere Uebung tauschen") — dann liegen die
+   Saetze nicht mehr unter der ID "pullup", sondern unter der, gegen die
+   getauscht wurde. `a.ersatz` bildet das ab, genau wie `tauscheUebung`
+   selbst es beim Zurueckrechnen auf die Wurzel benutzt — hier reicht die
+   einfache Vorwaertsrichtung, weil die Wurzel immer feststeht ("pullup"),
+   anders als bei `tauscheUebung`, das von einer beliebigen Start-ID aus
+   zurueckrechnen muss. Ohne diese Aufloesung sucht `klimmStand()` bzw.
+   `extraEinfuegen()` nach einer ID, die es in der Einheit nicht mehr gibt —
+   der Zaehler verliert bereits geleistete Wiederholungen, und der
+   Zusatzsatz landet wieder ganz am Ende. */
+function pullupAktuell(){
+  const a = S.active;
+  return (a && a.ersatz && a.ersatz.pullup) || "pullup";
+}
+function klimmStand(){
+  if (!S.active) return {summe:0, offen:0};
+  const zaehl = id => (S.active.sets[id] || [])
+    .filter(s => s.done).reduce((a, s) => a + (+s.reps || 0), 0);
+  /* `pullupAktuell()`, nicht das hartkodierte "pullup": die Saetze gehoeren
+     zum Programmpunkt, nicht zur Uebungs-ID (dieselbe Regel, die schon in
+     `tauscheUebung` gilt) — schon geleistete Klimmzuege zaehlen also auch
+     dann noch, wenn der Rest der Einheit inzwischen getauscht wurde. */
+  const summe = zaehl(pullupAktuell()) + zaehl("pullmax");
+  return {summe:summe, offen:Math.max(0, KLIMM_TAGESZIEL - summe)};
+}
+/* Sind alle Klimmzugsaetze abgehakt und die Uebung damit durch? Nur dann
+   steht die Frage nach dem Zusatzsatz an — mitten im Block waere sie eine
+   Aufforderung, die naechste Runde ausfallen zu lassen.
+
+   Bewusst *nicht* ueber `pullupAktuell()` aufgeloest, anders als
+   `klimmStand()`: das hier ist der Schalter, der ueberhaupt erst entscheidet,
+   ob der Tagesziel-Schirm erscheinen darf. Wurde "Klimmzuege" gegen etwas
+   anderes getauscht, hat der Nutzer bewusst keine Klimmzuege mehr gemacht —
+   der Schirm soll dann nicht mit "N Klimmzüge" aufwarten, waehrend in
+   Wirklichkeit eine andere Uebung laeuft. Bleibt die Suche hier hart auf
+   "pullup", kann der Schirm nach einem Tausch fuer den Rest der Einheit gar
+   nicht mehr erscheinen — die Einladung zum Zusatzsatz ruht, ohne dass es
+   dafuer eigenen Code braucht. Schon geleistete Wiederholungen gehen dabei
+   nicht verloren: die zaehlt `klimmStand()` weiterhin, dieser Schirm zeigt
+   sie nur nicht mehr an. */
+function klimmDurch(){
+  if (!S.active) return false;
+  const rows = S.active.sets.pullup || [];
+  return rows.length > 0 && rows.every(s => s.done);
+}
+function zusatzsatz(){
+  const a = S.active;
+  if (!a || (a.extra || []).indexOf("pullmax") >= 0) return;
+  a.extra = (a.extra || []).concat(["pullmax"]);
+  a.sets.pullmax = [{reps:5, done:false}];
+  if (a.weights.pullmax === undefined) a.weights.pullmax = a.weights.pullup || 0;
+  if (!a.cfg.pullmax) a.cfg.pullmax = cfgOf("pullmax");
+  save();
+}
+function viewFokus(){
+  const a = S.active, plan = planOf(a.plan);
+  const prog = sessionProgress();
+  const s = fokusSchritt();
+
+  let kopf = '<div class="fk-kopf">'
+    + '<button class="fk-weg" data-a="cancel">'+I.left+'</button>'
+    + '<div class="fk-kopfmitte">'
+    + '<div class="fk-plan">'+esc(plan ? plan.title : a.plan)+'</div>'
+    + '<div class="fk-stand">Satz '+Math.min(prog.done+1, prog.total)+' / '+prog.total
+    + (laeuft() ? ' · noch '+sessionLeftMin()+' min' : '')+'</div>'
+    + '</div>'
+    + '<button class="fk-um" data-a="ansicht">Liste</button>'
+    + '</div>';
+
+  /* Vor dem Start: Aufwaermen und der Startknopf. Die Zeitfrage steht hier
+     genauso wie in der Liste — danach ist sie beantwortet. */
+  if (!laeuft()) {
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">'+esc(plan ? plan.title : "")+'</div>'
+      + '<div class="fk-ziel">'+prog.total+' Sätze · rund '+sessionLeftMin()+' min</div>'
+      + '</div>'
+      + '<div class="fk-fuss">'
+      + '<button class="btn" data-a="startnow">Training starten</button>'
+      + '<button class="btn ghost" data-a="warmup">Aufwärmen · 3 min</button>'
+      + '</div>'
+      + '<div id="restslot"></div>'
+      + zeitKarte()
+      + '</div>';
+  }
+
+  /* Alles abgehakt: nur noch abschliessen. */
+  if (!s) {
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">Fertig</div>'
+      + '<div class="fk-ziel">Alle Sätze abgehakt</div></div>'
+      + '<div class="fk-fuss"><button class="btn" data-a="finish">Training abschließen</button></div>'
+      + '<div id="restslot"></div></div>';
+  }
+
+  /* Waehrend der Pause traegt der Schirm den Countdown und nichts sonst
+     ausser dem, was danach kommt. Das ist die eine Frage, die man in der
+     Pause hat. */
+  if (S.rest && restLeft() > 0) return '<div class="fokus">' + kopf + fokusPause(s) + '</div>';
+
+  const kl = klimmStand();
+  const hatZusatz = (a.extra || []).indexOf("pullmax") >= 0;
+  /* Der Block ist durch, wenn der naechste offene Schritt nicht mehr dazu
+     gehoert. Auf `klimmDurch()` allein zu pruefen hiesse, mitten im Wechsel
+     nach dem Zusatzsatz zu fragen, waehrend noch ein Dipsatz aussteht. */
+  const blockDurch = klimmDurch()
+    && (s.cfg && s.cfg.blk) !== (slotOf("pullup", a.plan) || {}).blk;
+  if (blockDurch && !hatZusatz && !a.zusatzWeg) {
+    const zuViel = (formForToday() && formForToday().level === "gelb")
+                || systemLoad().level !== "normal";
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">'+kl.summe+' Klimmzüge</div>'
+      + (kl.offen && !zuViel
+          ? '<div class="fk-ziel">Noch '+kl.offen+' bis zum Tagesziel</div>'
+          : zuViel
+          ? '<div class="fk-ziel">Heute nicht erzwingen.</div>'
+          : '<div class="fk-ziel">Tagesziel erreicht.</div>')
+      + '<div class="fk-hinweis">Zusatzsatz — so viele wie sauber gehen</div>'
+      + '</div>'
+      + '<div class="fk-fuss">'
+      + '<button class="btn'+(kl.offen && !zuViel ? '' : ' ghost')+'" data-a="zusatz">Zusatzsatz machen</button>'
+      + '<button class="btn ghost" data-a="zusatzweg">Reicht für heute</button>'
+      + '</div><div id="restslot"></div></div>';
+  }
+
+  if (s.art === "aufwaerm") {
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">'+esc(exName(s.ex))+'</div>'
+      + '<div class="fk-satz">Aufwärmsatz '+(s.i+1)+' · zählt nicht mit</div>'
+      + '<div class="fk-gewicht num">'+kg(s.gewicht)+' kg</div>'
+      + '<div class="fk-ziel">'+s.wdh+' Wiederholungen</div>'
+      + '</div>'
+      + '<div class="fk-fuss">'
+      + '<button class="btn" data-a="warmstufe" data-id="'+s.ex+'" data-i="'+s.i+'">Erledigt</button>'
+      + '</div><div id="restslot"></div></div>';
+  }
+
+  const rows = a.sets[s.ex] || [];
+  const satz = rows[s.i] || {reps:8, done:false};
+  const c = Object.assign({perSide:false, ecc:0, chain:0}, a.cfg[s.ex] || {});
+  const w = a.weights[s.ex];
+  const gewText = isBw(s.ex)
+    ? (w ? '+' + kg(w) + ' kg' : 'Körpergewicht')
+    : kg(w) + ' kg' + (c.perSide ? ' pro Seite' : '');
+  /* `num` ist fuer dichte Ziffern gedacht (siehe Kommentar am Bestand), nicht
+     fuer Fliesstext. Bei Koerpergewicht ohne Zusatzlast steht dort das Wort
+     "Körpergewicht" — die einzige Stelle, an der `gewText` nicht mit einer
+     Ziffer beginnt. */
+  const gewIstZahl = !isBw(s.ex) || !!w;
+  const zielText = s.cfg.total
+    ? s.cfg.total[0] + '–' + s.cfg.total[1] + ' gesamt'
+    : s.cfg.min + '–' + s.cfg.max + (istZeit(s.ex) ? ' s' : '');
+
+  return '<div class="fokus">' + kopf
+    + '<div class="fk-buehne">'
+    /* exIcon statt exArt: faellt eine Uebung ohne eigene Zeichnung auf das
+       Piktogramm zurueck, statt eine Luecke zu lassen. Groesse kommt aus der
+       CSS-Klasse (`.fk-art`), nicht aus den w/h-Parametern — die wuerden als
+       fester Pixelwert inline landen und liessen sich dann nicht mehr
+       responsiv deckeln. */
+    + exIcon(s.ex, null, null, "fk-art")
+    + '<div class="fk-uebung">'+esc(exName(s.ex))+'</div>'
+    + '<div class="fk-satz">Satz '+(s.i+1)+' von '+rows.length+'</div>'
+    + '<div class="fk-gewicht'+(gewIstZahl ? ' num' : '')+'">'+esc(gewText)+'</div>'
+    + '<div class="fk-ziel">Ziel: '+zielText+'</div>'
+    + '<div class="fk-eingabe">'
+    + '<button class="fk-rb" data-a="reps" data-id="'+s.ex+'" data-i="'+s.i+'" data-d="-'+schrittVon(s.ex)+'">'+I.minus+'</button>'
+    + '<div class="fk-zahl num" id="fkzahl">'+satz.reps+(istZeit(s.ex) ? '<small>s</small>' : '')+'</div>'
+    + '<button class="fk-rb" data-a="reps" data-id="'+s.ex+'" data-i="'+s.i+'" data-d="'+schrittVon(s.ex)+'">'+I.plus+'</button>'
+    + '</div></div>'
+    + '<div class="fk-fuss">'
+    + (istZeit(s.ex)
+        ? '<button class="btn ghost" data-a="uhr" data-id="'+s.ex+'" data-i="'+s.i+'">Stoppuhr</button>'
+        : '')
+    + '<button class="btn" data-a="log" data-id="'+s.ex+'" data-i="'+s.i+'">Satz fertig</button>'
+    + '</div>'
+    + '<div id="restslot"></div>'
+    + '</div>';
+}
+
+/* Der Pausenschirm. Der Countdown wird hier einmal gebaut und danach von
+   `renderRest` nur noch beschriftet — jede Sekunde neu zu erzeugen liesse
+   die Einblendung im Sekundentakt laufen, und genau das war frueher das
+   Flackern. Die Zeichnung der naechsten Uebung steht schon hier, klein und
+   gedaempft unter dem Countdown — man sieht waehrend der Pause, was kommt,
+   ohne dass sie mit der Zahl selbst um Aufmerksamkeit konkurriert. */
+function fokusPause(naechster){
+  const left = restLeft();
+  const txt = Math.floor(left/60) + ":" + String(left%60).padStart(2,"0");
+  let unten = "";
+  if (naechster) {
+    const a = S.active;
+    const c = Object.assign({perSide:false}, a.cfg[naechster.ex] || {});
+    const w = a.weights[naechster.ex];
+    const gew = naechster.art === "aufwaerm"
+      ? kg(naechster.gewicht) + ' kg'
+      : isBw(naechster.ex)
+        ? (w ? '+' + kg(w) + ' kg' : 'Körpergewicht')
+        : kg(w) + ' kg' + (c.perSide ? ' pro Seite' : '');
+    const ziel = naechster.art === "aufwaerm"
+      ? naechster.wdh + ' Wiederholungen'
+      : 'Ziel: ' + naechster.cfg.min + '–' + naechster.cfg.max
+        + (istZeit(naechster.ex) ? ' s' : '');
+    unten = '<div class="fk-danach">'
+      + exIcon(naechster.ex, null, null, "fk-danach-art")
+      + '<div class="fk-danachtitel">Danach: '+esc(exName(naechster.ex))+'</div>'
+      + '<div class="fk-ziel">'+esc(gew)+'</div>'
+      + '<div class="fk-ziel">'+ziel+'</div></div>';
+  }
+  return '<div class="fk-buehne">'
+    + '<div class="fk-count num" id="fkrest">'+txt+'</div>'
+    + '<div class="fk-pauselbl">'+(S.rest && S.rest.aufwaerm ? 'Aufwärmen'
+        : S.rest && S.rest.wechsel ? 'Übergang' : 'Pause')+'</div>'
+    + unten + '</div>'
+    + '<div class="fk-fuss">'
+    + '<button class="btn ghost" data-a="skiprest">Pause überspringen</button>'
+    + '</div><div id="restslot"></div>';
+}
+
 function setRow(e, s, i){
   return '<div class="set'+(s.done?" done":"")+'" data-row="'+e.id+':'+i+'">'
     + '<span class="idx">'+(i+1)+'</span><div class="mid">'
@@ -5098,7 +5667,13 @@ function renderTabs(){
    schwer auffindbare Folgefehler. */
 function render(){
   let html, flat = false;
-  if (S.active) { html = viewSession(); flat = false; }
+  /* `flat` steuert nur das untere Polster — reserviert fuer die Reiterleiste,
+     die `renderTabs()` waehrend jeder laufenden Einheit ohnehin leert. Ohne
+     `flat` bliebe das Polster einer Leiste stehen, die es hier nicht gibt,
+     und der Fokusschirm liefe ueber den sichtbaren Bereich hinaus. Gilt fuer
+     beide Unteransichten der Einheit gleichermassen — auch die Liste hat
+     waehrend einer Einheit keine Reiterleiste. */
+  if (S.active) { html = S.active.fokus ? viewFokus() : viewSession(); flat = true; }
   else if (route && route.view === "session") { html = viewSessionDetail(route.id); flat = true; }
   else if (route && route.view === "exercise") { html = viewExercise(route.id); flat = true; }
   else if (route && route.view === "planlist") { html = viewPlanList(); flat = true; }
@@ -5108,7 +5683,7 @@ function render(){
   else if (tab === "verlauf") html = viewVerlauf();
   else if (tab === "ziele") html = viewZiele();
   else html = viewMehr();
-  const key = S.active ? "session:" + S.active.plan
+  const key = S.active ? "session:" + S.active.plan + (S.active.fokus ? ":fk" : "")
             : route ? route.view + ":" + (route.id || "")
             : tab;
   setHTML(html, flat, key);
@@ -5139,6 +5714,20 @@ function ringZeigen(){
 }
 
 function renderRest(){
+  /* Im Fokusmodus traegt der Schirm den Countdown selbst und gross. Der
+     schwebende Balken hat dort nichts verloren — er wuerde dieselbe Zahl ein
+     zweites Mal zeigen. */
+  const fk = document.getElementById("fkrest");
+  if (fk && S.active && S.active.fokus) {
+    restEl.innerHTML = "";
+    const slot = document.getElementById("restslot");
+    if (slot) slot.innerHTML = "";
+    if (!S.rest) { render(); return; }
+    const l = restLeft();
+    const t = Math.floor(l/60) + ":" + String(l%60).padStart(2,"0");
+    if (fk.textContent !== t) fk.textContent = t;
+    return;
+  }
   /* Waehrend einer Einheit gehoert die Pause nach oben zur Kopfzeile: dort
      steht schon alles andere, und beim Scrollen durch die Saetze bleibt sie
      sichtbar. Ohne laufende Einheit bleibt der schwebende Balken unten. */
@@ -5167,10 +5756,14 @@ function renderRest(){
   const txt = over ? "00:00" : m + ":" + sec;
   if (t && t.textContent !== txt) t.textContent = txt;
   const lbl = document.querySelector("#restlbl span");
-  /* Dieselbe Zeile traegt drei Dinge: Aufwaermen vor dem Start, die Pause
-     zwischen Saetzen und den kuerzeren Uebergang zwischen zwei Uebungen.
-     Ein eigenes Bauteil je Fall waere dreimal derselbe Balken. */
+  /* Dieselbe Zeile traegt vier Dinge: das allgemeine Aufwaermen vor dem
+     Start (`S.rest.warm`), den Uebergang zwischen zwei Aufwaermstufen einer
+     Uebung (`S.rest.aufwaerm` — eigenes Feld, eigene kurze Dauer, siehe
+     `startRest`), die Pause zwischen Saetzen und den kuerzeren Uebergang
+     zwischen zwei Uebungen. Ein eigenes Bauteil je Fall waere viermal
+     derselbe Balken. */
   const ltxt = S.rest.warm ? (over ? "Aufgewärmt" : "Aufwärmen")
+             : S.rest.aufwaerm ? (over ? "Weiter" : "Aufwärmen")
              : S.rest.wechsel ? (over ? "Weiter" : "Übergang")
              : (over ? "Pause vorbei" : "Pause");
   if (lbl && lbl.textContent !== ltxt) lbl.textContent = ltxt;
@@ -5181,29 +5774,34 @@ function renderRest(){
   if (p) p.style.width = (frac*100).toFixed(1) + "%";
 }
 /* Was nach diesem Satz noch offen ist — daran haengt, wie lange die Pause
-   ueberhaupt sein soll. Drei Faelle, drei Antworten:
-   nichts mehr offen  -> gar keine Pause. Die Einheit ist vorbei.
-   nur noch anderswo  -> Uebergang statt Pause. Das Umbauen dauert ohnehin,
-                         und der naechste Muskel ist ein anderer.
-   dieselbe Uebung    -> die volle Pause. Nur hier zaehlt sie wirklich. */
+   sein soll. Gefragt wird der Ablauf, nicht die Uebung:
+   naechster Schritt dieselbe Uebung -> volle Pause
+   naechster Schritt eine andere     -> Uebergang. Das Umbauen dauert ohnehin,
+                                        und der naechste Muskel ist ein anderer
+   kein naechster Schritt            -> gar keine. Die Einheit ist vorbei.
+   Ohne Wechselblock ist das genau das bisherige Verhalten. */
 function restArt(exId){
   if (!S.active) return {art:"voll"};
-  const offenHier = (S.active.sets[exId] || []).some(x => !x.done);
-  if (offenHier) return {art:"voll"};
-  const offenSonst = activeExList().some(e =>
-    e.id !== exId && !(S.active.skipped || {})[e.id]
-    && (S.active.sets[e.id] || []).some(x => !x.done));
-  return {art: offenSonst ? "wechsel" : "ende"};
+  const offen = ablaufOffen();
+  if (!offen.length) return {art:"ende"};
+  return {art: offen[0].ex === exId ? "voll" : "wechsel"};
 }
 
-function startRest(exId){
+/* `aufwaerm` markiert die kurze Pause nach einer Aufwaermstufe — dieselbe
+   Konstante, mit der auch `folgeDauer` rechnet (siehe dort). Sie überstimmt
+   `restArt`: eine Aufwaermstufe fuehrt zur eigenen Uebung zurueck (art
+   "voll" nach der bisherigen Logik), aber die volle Pause der Uebung waere
+   hier falsch — das war genau die Luecke, durch die nach dem Abhaken einer
+   Stufe gar keine Pause lief. */
+function startRest(exId, aufwaerm){
   const art = exId ? restArt(exId).art : "voll";
   if (art === "ende") {
     S.rest = null; restDone = true; save(); renderRest(); liveMelden(); pausePlanen(); return;
   }
   const voll = exId ? restFor(exId) : (S.settings.rest || 120);
-  const dauer = art === "wechsel" ? uebergangDauer(voll) : voll;
-  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer, wechsel: art === "wechsel"};
+  const dauer = aufwaerm ? AUFWAERM_UEBERGANG_S : (art === "wechsel" ? uebergangDauer(voll) : voll);
+  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer,
+            wechsel: art === "wechsel" && !aufwaerm, aufwaerm: !!aufwaerm};
   restDone = false;
   save();
   renderRest();
@@ -5216,21 +5814,13 @@ function startRest(exId){
    oberen Rand verdeckt. */
 function zumNaechstenSatz(){
   if (!S.active) return;
-  /* Ausgefallene Uebungen ueberspringen — sonst springt die Ansicht nach der
-     Pause auf eine Uebung, die heute gar nicht stattfindet. */
-  for (const e of activeExList()) {
-    if ((S.active.skipped || {})[e.id]) continue;
-    const saetze = S.active.sets[e.id] || [];
-    const i = saetze.findIndex(s => !s.done);
-    if (i < 0) continue;
-    const row = document.querySelector('[data-row="'+e.id+':'+i+'"]');
-    if (row) {
-      row.scrollIntoView({block:"center", behavior:"smooth"});
-      row.classList.add("dran");
-      setTimeout(() => row.classList.remove("dran"), 2200);
-    }
-    return;
-  }
+  const s = ablaufOffen()[0];
+  if (!s) return;
+  const row = document.querySelector('[data-row="'+s.ex+':'+s.i+'"]');
+  if (!row) return;
+  row.scrollIntoView({block:"center", behavior:"smooth"});
+  row.classList.add("dran");
+  setTimeout(() => row.classList.remove("dran"), 2200);
 }
 
 /* ---------------------------------------------------------- Live Activity */
@@ -5241,15 +5831,20 @@ function zumNaechstenSatz(){
    Die Pause geht als Zeitpunkt hinueber, nicht als Restsekunden: der
    Sperrbildschirm zaehlt daraus selbst herunter, ohne dass die App auch nur
    einmal geweckt wird. */
+/* `warm` unterscheidet einen Aufwaermschritt von einem echten Satz — ohne
+   das meldet die Huelle „Satz 1 von 3" fuer eine Aufwaermstufe, mit falscher
+   Zielzahl (die Anzahl der Arbeitssaetze, nicht der Aufwaermstufen) und ohne
+   jede Kennzeichnung. Auf dem Sperrbildschirm stuende dann etwas anderes als
+   auf dem Schirm in der Hand. */
 function naechsterOffenerSatz(){
-  if (!S.active) return null;
-  for (const e of activeExList()) {
-    if ((S.active.skipped || {})[e.id]) continue;
-    const saetze = S.active.sets[e.id] || [];
-    const i = saetze.findIndex(s => !s.done);
-    if (i >= 0) return {id:e.id, nr:i + 1, von:saetze.length};
+  const offen = ablaufOffen();
+  if (!offen.length) return null;
+  const s = offen[0];
+  if (s.art === "aufwaerm") {
+    return {id:s.ex, nr:s.i + 1, von:warmSchritte(s.ex).length, warm:true};
   }
-  return null;
+  const alle = (S.active.sets[s.ex] || []).length;
+  return {id:s.ex, nr:s.i + 1, von:alle, warm:false};
 }
 function liveMelden(){
   if (typeof window === "undefined" || !window.__training_live) return;
@@ -5261,7 +5856,12 @@ function liveMelden(){
   window.__training_live({
     plan: (pl && pl.title) || "Training",
     ex: s ? exName(s.id) : "Alle Sätze erledigt",
-    satz: s ? ("Satz " + s.nr + " von " + s.von) : "",
+    /* Der Text bleibt fuer sich lesbar, auch fuer eine Huelle, die das neue
+       `warm`-Feld (unten) noch nicht kennt — abwaertskompatibel heisst hier:
+       eine aeltere Huelle ignoriert das zusaetzliche Feld einfach und zeigt
+       trotzdem den richtigen Text. */
+    satz: s ? ((s.warm ? "Aufwärmen " : "Satz ") + s.nr + " von " + s.von) : "",
+    warm: s ? !!s.warm : false,
     done: prog.done, total: prog.total,
     restEnds: laeuft ? S.rest.endsAt : 0,
     restFrom: laeuft ? S.rest.endsAt - S.rest.total * 1000 : 0,
@@ -5288,6 +5888,14 @@ function tickRest(){
        lange nachdem die Pause vorbei war. */
     if (!pauseNativ()) ton("ende");
     zumNaechstenSatz();
+    /* Im Fokusmodus wechselt die Ansicht von allein weiter — das ist der
+       Kern des gefuehrten Modus: Piep, naechste Uebung, ohne Bedienung.
+       S.rest muss dafuer weg, nicht nur abgelaufen sein: sonst rendert
+       `render()` gleich darauf den naechsten Schirm (Satz oder Aufwaermen,
+       keiner davon kennt `#fkrest`), `renderRest()` faellt zurueck auf den
+       schwebenden Balken und der zeigt "00:00" ueber der naechsten Uebung —
+       eine Pause, die laengst vorbei ist, so als liefe sie noch. */
+    if (S.active && S.active.fokus) { S.rest = null; render(); return; }
   }
   renderRest();
 }
@@ -6869,10 +7477,44 @@ function importSheet(data){
 }
 
 /* =============================================================== actions */
+/* Wohin ein Extra in die Liste kommt. Pauschal ans Ende — ausser `pullmax`:
+   das ist keine beliebige Zusatzuebung, sondern eine Variante der Klimmzuege,
+   die im Plan schon steht. Sie muss unmittelbar hinter deren Wechselblock
+   stehen, sonst folgt der Maximalsatz erst nach der ganzen uebrigen Einheit,
+   wenn Griff und Arme laengst durch anderes ausgelastet sind — und genau das
+   sollte der eigene Zusatzsatz vermeiden. Alles andere, was ueber "Uebung
+   hinzufuegen" gewaehlt wird, ist keine Variante einer Plan-Uebung und bleibt
+   am Ende, wie bisher. Eine allgemeine Einfuegeposition fuer Extras waere
+   spekulativ fuer einen einzigen Anwendungsfall — diese enge Regel reicht.
+
+   Gesucht wird ueber `pullupAktuell()`, nicht ueber die hartkodierte ID
+   "pullup": wurde "Klimmzuege" schon gegen etwas anderes getauscht (`data-a=
+   "tauschDo"` in `tauscheUebung`), steht der Block unter der neuen ID, und
+   die hartkodierte Suche liefe ins Leere — `pullmax` laendete wieder am Ende,
+   genau der Fehler, den diese Funktion beheben soll. */
+function extraEinfuegen(list, item){
+  if (item.id !== "pullmax") { list.push(item); return; }
+  const puIdx = list.findIndex(x => x.id === pullupAktuell());
+  if (puIdx < 0) { list.push(item); return; }
+  /* Hinter den ganzen Wechselblock, nicht nur hinter den ersten Eintrag:
+     Klimmzuege und Dips laufen unter derselben `blk`-Kennung, und der
+     Maximalsatz gehoert nach beiden, nicht dazwischen. */
+  const blk = list[puIdx].blk;
+  let pos = puIdx;
+  while (blk && pos + 1 < list.length && list[pos + 1].blk === blk) pos++;
+  list.splice(pos + 1, 0, item);
+}
 function startSession(id, extra){
   const p = planOf(id), sets = {}, weights = {}, cf = {};
   const list = p.ex.slice();
-  (extra || []).forEach(m => { if (!list.some(x => x.id === m.id)) list.push({id:m.id, sets:3, min:6, max:10}); });
+  /* Extras erben pauschal drei Saetze — ausser `pullmax`: das ist ein
+     einzelner Satz, so viele wie gehen, genau wie an den Zugtagen. */
+  (extra || []).forEach(m => {
+    if (list.some(x => x.id === m.id)) return;
+    extraEinfuegen(list, m.id === "pullmax"
+      ? {id:"pullmax", sets:1, min:1, max:30, prio:1}
+      : {id:m.id, sets:3, min:6, max:10});
+  });
   list.forEach(e => {
     sets[e.id] = [];
     for (let i = 0; i < e.sets; i++) sets[e.id].push({reps:e.max, done:false});
@@ -6890,7 +7532,12 @@ function startSession(id, extra){
      Vorher lief die Uhr, sobald man nur nachsehen wollte, welche Uebungen
      anstehen — im echten Verlauf standen dadurch 186, 128 und 103 Minuten. */
   S.active = {plan:id, extra:(extra||[]).map(m => m.id), startedAt:0,
-              sets:sets, weights:weights, cfg:cf, skipped:{}, zeit:0};
+              sets:sets, weights:weights, cfg:cf, skipped:{}, zeit:0,
+              /* Gefuehrt ist die Voreinstellung: ein Satz auf dem Schirm,
+                 danach fuehrt die App weiter. Die Liste bleibt einen Griff
+                 entfernt — sie traegt Gewichtsvorschlag, Tausch und
+                 "Letztes Mal", was im Fokus keinen Platz haette. */
+              fokus:true};
   S.rest = null;
   keepAwake(true);
   save(); render(); toTop();
@@ -6906,7 +7553,14 @@ function activeExList(){
   const list = p.ex.map(e => ers[e.id]
     ? Object.assign({}, e, {id: ers[e.id], statt: e.id})
     : e);
-  (a.extra || []).forEach(id => { if (!list.some(x => x.id === id)) list.push({id:id, sets:3, min:6, max:10}); });
+  /* Extras erben pauschal drei Saetze — ausser `pullmax`: das ist ein
+     einzelner Satz, so viele wie gehen, genau wie an den Zugtagen. */
+  (a.extra || []).forEach(id => {
+    if (list.some(x => x.id === id)) return;
+    extraEinfuegen(list, id === "pullmax"
+      ? {id:"pullmax", sets:1, min:1, max:30, prio:1}
+      : {id:id, sets:3, min:6, max:10});
+  });
   return list;
 }
 
@@ -7327,6 +7981,10 @@ document.addEventListener("click", ev => {
   }
   if (a === "startnow") { buzz(14); unlockAudio(); startNow(); return; }
   if (a === "warmup") { buzz(13); unlockAudio(); startWarmup(); return; }
+  if (a === "ansicht") {
+    S.active.fokus = !S.active.fokus;
+    save(); render(); toTop(); return;
+  }
   if (a === "sysinfo") { buzz(); sysSheet(); return; }
   if (a === "healthask") {
     buzz();
@@ -7533,13 +8191,30 @@ document.addEventListener("click", ev => {
     buzz(11);
     S.active.warm = S.active.warm || {};
     const stufe = +el.dataset.i + 1;
-    S.active.warm[id] = S.active.warm[id] === stufe ? stufe - 1 : stufe;
+    const vorherStand = +S.active.warm[id] || 0;
+    /* Im Fokusmodus zeigt der Schirm immer nur die naechste offene Stufe —
+       ein zweiter Antipp vor dem Fortschreiben (schnelles Doppeltippen) darf
+       sie dann nicht wieder auf 0 zuruecksetzen, es gibt dort keinen
+       "falschen" Chip zum Korrigieren, nur vorwaerts. In der Liste bleibt der
+       Toggle: dort stehen alle Stufen gleichzeitig, und nochmal auf dieselbe
+       hebt einen Vertipper wieder auf (Kommentar oben). */
+    S.active.warm[id] = S.active.fokus
+      ? Math.max(vorherStand, stufe)
+      : (vorherStand === stufe ? stufe - 1 : stufe);
     save();
     const box = document.querySelector('[data-sets="'+id+'"]');
     if (box && box.parentElement) {
       const alt = box.parentElement.querySelector(".warmzeile");
       if (alt) alt.outerHTML = aufwaermZeile(id, S.active.weights[id]);
     }
+    /* Nur beim tatsaechlichen Fortschritt eine Pause anstossen — beim
+       Zurueckkorrigieren in der Liste (Stand sinkt) waere eine neue Pause
+       falsch, dafuer war gerade keine Zeit vergangen, nur ein Vertipper. Die
+       Pause selbst ist die kurze Aufwaerm-Uebergangszeit, egal ob danach
+       noch eine Stufe folgt oder schon der erste Arbeitssatz — genau die
+       Zahl, mit der auch `folgeDauer` fuer diesen Schritt rechnet. */
+    if (S.active.warm[id] > vorherStand) startRest(id, true);
+    if (S.active.fokus) { render(); return; }
     return;
   }
   if (a === "ps") {
@@ -7598,6 +8273,11 @@ document.addEventListener("click", ev => {
     /* innerHTML statt textContent: bei Zeitübungen haengt die Einheit mit im
        Feld, und textContent wuerde sie beim ersten Tippen entfernen. */
     if (row) row.querySelector(".reps").innerHTML = s.reps + (istZeit(id) ? '<small>s</small>' : '');
+    /* Dieselbe Zahl im Fokusschirm: dort gibt es keine Zeile, sondern die
+       eine grosse Zahl. Beide Ansichten koennen offen gewesen sein — welches
+       Element existiert, entscheidet, was aktualisiert wird. */
+    const fk = document.getElementById("fkzahl");
+    if (fk) fk.innerHTML = s.reps + (istZeit(id) ? '<small>s</small>' : '');
     updateSub(cfg); updateDuel(); return;
   }
   if (a === "log") {
@@ -7619,6 +8299,10 @@ document.addEventListener("click", ev => {
     if (s.done) startRest(id);
     updateSub(cfg); updateCount(); updateDuel(); updateBody();
     updateRir(id, cfg);
+    /* Im Fokusmodus traegt der Schirm genau einen Satz. Ist der abgehakt,
+       ist der Schirm ein anderer — anders als in der Liste, wo nur eine
+       Zeile ihre Farbe wechselt. */
+    if (S.active.fokus) { render(); return; }
     return;
   }
   if (a === "addset") {
@@ -7630,6 +8314,8 @@ document.addEventListener("click", ev => {
     updateCount(); return;
   }
   if (a === "skiprest") { S.rest = null; restDone = true; pausePlanen(); save(); renderRest(); return; }
+  if (a === "zusatz") { zusatzsatz(); render(); return; }
+  if (a === "zusatzweg") { S.active.zusatzWeg = true; save(); render(); return; }
   if (a === "finish") { abschlussPruefen(); return; }
   if (a === "abbruchdo") {
     buzz();
