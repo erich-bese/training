@@ -4848,17 +4848,20 @@ function sessionLeftMin(){
    Die App entscheidet das nicht heimlich: sie zeigt, was wegfaellt, und der
    volle Umfang ist immer einen Griff entfernt.
 
-   Wichtig oder nicht wird an der Pausendauer abgelesen. Die steht ohnehin je
-   Uebung fest und ist bereits genau diese Einordnung — 180 Sekunden beim
-   Kreuzheben, 45 beim Bauch. Eine zweite Liste danebenzustellen hiesse,
-   dieselbe Aussage an zwei Stellen zu pflegen und sie irgendwann
-   auseinanderlaufen zu lassen. */
-const ZEIT_STUFEN = [30, 45, 60];
+   Wichtig oder nicht wurde bisher an der Pausendauer abgelesen. Fuer die
+   Splitplaene stimmt das noch — dort bleibt es der Rueckfall. Bei den
+   Ganzkoerperplaenen aber traegt Rudern 120 Sekunden, weil der Ruecken sie
+   braucht, nicht weil es wichtiger waere als die Kniebeuge. Dort gilt jetzt
+   die Rangfolge, die am Programmpunkt selbst steht: `prio`. */
+const ZEIT_STUFEN = [20, 30, 40];
 const ZEIT_GRUND = "Keine Zeit";      /* einer der SKIP_REASONS, bewusst */
 /* Ab dieser Pausendauer gilt eine Uebung als tragend: Klimmzuege, Rudern,
-   Kreuzheben, Kniebeuge, Bank, Dips, Schulterdruecken, Split Squats. */
+   Kreuzheben, Kniebeuge, Bank, Dips, Schulterdruecken, Split Squats.
+   Rueckfall fuer Plaene ohne `prio` — die sechs Splitplaene und selbst
+   bearbeitete Kopien. */
 const KERN_PAUSE = 120;
 const istKern = id => restFor(id) >= KERN_PAUSE;
+const prioVon = e => +e.prio || (istKern(e.id) ? 1 : 3);
 /* Untergrenzen beim Kuerzen. Ein einzelner Satz ist kein Training; die erste
    Uebung der Einheit traegt sie und behaelt drei. */
 const MIN_SAETZE = 2;
@@ -4898,51 +4901,51 @@ function zeitPlan(minuten){
   if (!a) return null;
   const budget = Math.max(5, +minuten || 0) * 60;
   const liste = activeExList().map((e, i) => ({
-    id:e.id, i:i, voll:vollSaetze(e), saetze:vollSaetze(e), wdh:vollWdh(e), kern:istKern(e.id)
+    id:e.id, i:i, blk:e.blk || null, prio:prioVon(e),
+    voll:vollSaetze(e), saetze:vollSaetze(e), wdh:vollWdh(e)
   }));
-  const dauer = () => folgeDauer(liste);
+  /* Gerechnet wird ueber denselben Ablauf wie ueberall sonst — sonst stuende
+     auf dem Knopf eine andere Zahl als zwei Zeilen darunter. `wdh` wird nach
+     dem Bauen der Schritte gezielt nachgetragen: `ablauf()` kennt nur `cfg`,
+     und `folgeDauer` faellt ohne `wdh` auf den Plan-Mittelwert zurueck — das
+     waere fuer Haengen (Sekunden statt Wiederholungen) und fuer bereits
+     eingetragene Saetze die falsche Zahl. */
+  const dauer = () => folgeDauer(ablauf(
+    {ex: liste.filter(x => x.saetze > 0).map(x =>
+      Object.assign({}, x, {sets:x.saetze}))},
+    null).map(s => Object.assign({}, s, {wdh: vollWdh({id: s.ex})})));
 
-  /* 1. Nebenuebungen streichen, von hinten. Die Reihenfolge im Plan ist seine
-        eigene Rangfolge — was ihm wichtiger ist, steht weiter vorn. Nach der
-        Pausendauer zu sortieren waere naheliegend, faellt aber falsch aus:
-        das Haengen traegt 90 Sekunden, weil die Sehne Zeit braucht, nicht
-        weil es wichtiger waere als Seitheben. */
+  /* 1. Von hinten streichen, Stufe fuer Stufe — und immer den ganzen Block.
+        Ein halber Zirkel ist kein Zirkel: wer Butterfly und Rudern macht und
+        Schulterdruecken weglaesst, hat den Zirkel nicht gekuerzt, sondern
+        kaputtgemacht. Prio 1 wird hier nie ganz gestrichen. */
   const weg = [];
-  const kandidaten = liste.filter(x => !x.kern).sort((p, q) => q.i - p.i);
-  for (const k of kandidaten) {
-    if (dauer() <= budget) break;
-    k.saetze = 0;
-    weg.push(k.id);
-  }
+  [3, 2].forEach(stufe => {
+    const gruppen = [];
+    liste.filter(x => x.prio === stufe && x.saetze > 0).forEach(x => {
+      const g = gruppen.find(y => y.blk && y.blk === x.blk);
+      if (g) g.teile.push(x); else gruppen.push({blk:x.blk, teile:[x]});
+    });
+    gruppen.sort((p, q) => q.teile[0].i - p.teile[0].i);
+    for (const g of gruppen) {
+      if (dauer() <= budget) return;
+      g.teile.forEach(x => { x.saetze = 0; weg.push(x.id); });
+    }
+  });
 
-  /* 2. Reicht das nicht, Saetze kuerzen. Immer dort, wo gerade die meisten
-        stehen — sonst schrumpft die letzte Uebung auf zwei, waehrend vorn
-        noch fuenf stehen. */
+  /* 2. Reicht das nicht, Saetze bei Prio 1 kuerzen — Prio 2 und 3 sind an
+        dieser Stelle entweder ganz drin oder ganz raus, da wird nichts mehr
+        angefasst. Immer dort kuerzen, wo gerade die meisten Saetze stehen —
+        sonst schrumpft die letzte Uebung auf zwei, waehrend vorn noch fuenf
+        stehen. */
   let sicher = 0;
   while (dauer() > budget && sicher++ < 300) {
     const k = liste
-      .filter(x => x.saetze > (x.i === 0 ? MIN_SAETZE_ERSTE : MIN_SAETZE))
+      .filter(x => x.prio === 1
+        && x.saetze > (x.i === 0 ? MIN_SAETZE_ERSTE : MIN_SAETZE))
       .sort((p, q) => q.saetze - p.saetze || q.i - p.i)[0];
     if (!k) break;
     k.saetze--;
-  }
-
-  /* 3. Was jetzt doch noch in die Zeit passt, kommt zurueck — notfalls mit
-        weniger Saetzen. Ohne diesen Schritt landete eine Einheit bei 40
-        Minuten, obwohl 45 da waren: gestrichen wird in ganzen Uebungen, und
-        die letzte davon hat oft mehr Platz genommen als noetig. Zurueck kommt
-        zuerst die wichtigste der gestrichenen — gestrichen wurde von hinten,
-        also ist das die zuletzt gestrichene. */
-  for (let k = weg.length - 1; k >= 0; k--) {
-    const x = liste.find(y => y.id === weg[k]);
-    if (!x) continue;
-    let n = 0;
-    while (n < x.voll) {
-      x.saetze = n + 1;
-      if (dauer() > budget) { x.saetze = n; break; }
-      n = x.saetze;
-    }
-    if (x.saetze >= MIN_SAETZE) weg.splice(k, 1); else x.saetze = 0;
   }
 
   return {liste:liste, weg:weg, minuten:Math.round(dauer() / 60),
@@ -4994,6 +4997,9 @@ function zeitKarte(){
   const a = S.active;
   const voll = vollDauerMin();
   const gewaehlt = +a.zeit || 0;
+  /* Der kleinste Modus landet bei rund 22 Minuten und nicht darunter — die
+     Untergrenzen lassen drei Klimmzug-, zwei Dip- und zwei Kreuzhebesaetze
+     stehen. Das steht so da, statt auf 20 heruntergerechnet zu werden. */
   const stufen = ZEIT_STUFEN.filter(m => m < voll - 4);
 
   const weg = activeExList().filter(e => ((a.skipped || {})[e.id] || {}).auto).map(e => e.id);
