@@ -1433,7 +1433,7 @@
 
 /* Sichtbar unter Mehr > Version. Bei jeder Aenderung mit hochzaehlen, damit man
    auf dem Geraet erkennen kann, welcher Stand tatsaechlich laeuft. */
-const APP_VERSION = "10.0";
+const APP_VERSION = "10.1";
 
 /* ================================================================== icons */
 const I = {
@@ -4212,6 +4212,11 @@ function viewHeute(){
    Startseite und unter "Mehr". */
 function viewPlan(){
   let h = '<h1>Plan</h1>';
+  /* Nur fuer die Reihenfolge der Planliste weiter unten: der empfohlene Plan
+     steht oben. An einem Ruhetag gibt es keinen — dann greift die uebrige
+     Rangfolge. */
+  const empf = recommend();
+  const empfId = empf.kind === "plan" ? empf.planId : null;
 
   /* Wochenvorschau — nur wenn ueberhaupt etwas vorgeschlagen wird */
   const vorschau = weekAhead();
@@ -4234,7 +4239,7 @@ function viewPlan(){
 
   h += '<div class="stack"><div class="eyebrow"><span>Deine Pläne</span>'
     + '<span class="faint">Dauer · Sätze</span></div><div class="card">'
-    + Object.keys(plans()).map((pid, i) => {
+    + planReihenfolge(empfId).map((pid, i) => {
         const pl = planOf(pid), d = planDuration(pid);
         return '<div class="planrow'+(i ? " tr" : "")+'" data-a="planedit" data-id="'+pid+'">'
           + exIcon(pl.ex[0].id, 34, 45)
@@ -7112,19 +7117,35 @@ function planZustand(pid, st){
   return {art:"frei", text:"Erholt", detail:joinNames(haupt.map(m => by[m])) + " frisch"};
 }
 
+/* Reihenfolge der Plaene in jeder Liste, die man antippt. Empfohlener zuerst,
+   danach die uebrigen waehlbaren, ganz unten die stillgelegten.
+
+   Ohne das stand `Object.keys` da — und das ist die Reihenfolge im Quelltext.
+   Seit die sechs Splitplaene `noSuggest` tragen, hiess das: erst sechs Plaene,
+   die er nie mehr benutzt, und darunter die beiden, um die es geht. Wer
+   trainieren will, hat keinen Grund, an sechs Karteileichen vorbeizuscrollen. */
+function planReihenfolge(empfohlen){
+  const alle = Object.keys(plans());
+  const rang = k => k === empfohlen ? 0 : planOf(k).noSuggest ? 2 : 1;
+  /* Stabil sortieren: innerhalb einer Stufe bleibt die Reihenfolge des Plans
+     erhalten, damit A immer vor B steht. */
+  return alle.map((k, i) => ({k:k, i:i}))
+             .sort((a, b) => rang(a.k) - rang(b.k) || a.i - b.i)
+             .map(x => x.k);
+}
 function pickSheet(){
   const rec = recommend();
   const rid = rec.kind === "plan" ? rec.planId : null;
   openSheet('<h3>Training auswählen</h3>'
     + '<div class="sh-sub">'+esc(rec.why)+'</div>'
-    /* Die Rangfolge stand nirgends, und ohne sie sieht die Empfehlung
-       willkuerlich aus: warum Pull, wenn Push laenger zurueckliegt? Weil
-       Erholung vor Rueckstand geht. Ein Satz, der genau das sagt. */
-    + '<div class="note" style="padding:0 2px 13px">Sortiert ist nach deinem Plan, '
-    + 'nicht nach der Empfehlung. Entschieden wird zuerst nach Erholung, dann '
-    + 'nach Rückstand — ein Plan mit frischen Muskeln geht vor einem, der länger '
-    + 'zurückliegt, aber noch belastet ist.</div>'
-    + Object.keys(plans()).map(k => {
+    /* Der empfohlene Plan steht oben, danach der andere Ganzkoerpertag, ganz
+       unten der Splitplan. Vorher stand hier die Reihenfolge des Quelltexts,
+       und die Empfehlung lag unter sechs stillgelegten Plaenen. */
+    + '<div class="note" style="padding:0 2px 13px">Oben steht die Empfehlung. '
+    + 'Entschieden wird zuerst nach Erholung, dann nach Rückstand — ein Plan mit '
+    + 'frischen Muskeln geht vor einem, der länger zurückliegt, aber noch '
+    + 'belastet ist. Darunter der Splitplan, falls du ihn doch willst.</div>'
+    + planReihenfolge(rid).map(k => {
         const pl = plans()[k];
         /* Die ersten Übungen als Vorschau: daran erkennt man einen Plan schneller
            als am Titel, gerade bei den beiden Bein-Varianten. Einzeilig gehalten
@@ -7838,7 +7859,7 @@ document.addEventListener("click", ev => {
       + '<div class="sh-sub">Datum wählen, dann den Plan. Die Sätze trägst du danach ein.</div>'
       + '<input class="field text" id="pd" type="date" max="'+heute+'" value="'+heute+'">'
       + '<div style="margin-top:16px">'
-      + Object.keys(plans()).map(k => '<button class="pick" data-a="addpastDo" data-x="'+k+'">'
+      + planReihenfolge(null).map(k => '<button class="pick" data-a="addpastDo" data-x="'+k+'">'
           + exIcon(plans()[k].ex[0].id, 40, 52)
           + '<div class="pbody"><div class="ptitle">'+esc(plans()[k].title)+'</div>'
           + '<div class="pmeta">'+plans()[k].ex.length+' Übungen</div></div></button>').join("")
