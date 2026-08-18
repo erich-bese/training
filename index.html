@@ -7440,6 +7440,27 @@ function importSheet(data){
 }
 
 /* =============================================================== actions */
+/* Wohin ein Extra in die Liste kommt. Pauschal ans Ende — ausser `pullmax`:
+   das ist keine beliebige Zusatzuebung, sondern eine Variante der Klimmzuege,
+   die im Plan schon steht. Sie muss unmittelbar hinter deren Wechselblock
+   stehen, sonst folgt der Maximalsatz erst nach der ganzen uebrigen Einheit,
+   wenn Griff und Arme laengst durch anderes ausgelastet sind — und genau das
+   sollte der eigene Zusatzsatz vermeiden. Alles andere, was ueber "Uebung
+   hinzufuegen" gewaehlt wird, ist keine Variante einer Plan-Uebung und bleibt
+   am Ende, wie bisher. Eine allgemeine Einfuegeposition fuer Extras waere
+   spekulativ fuer einen einzigen Anwendungsfall — diese enge Regel reicht. */
+function extraEinfuegen(list, item){
+  if (item.id !== "pullmax") { list.push(item); return; }
+  const puIdx = list.findIndex(x => x.id === "pullup");
+  if (puIdx < 0) { list.push(item); return; }
+  /* Hinter den ganzen Wechselblock, nicht nur hinter den ersten Eintrag:
+     Klimmzuege und Dips laufen unter derselben `blk`-Kennung, und der
+     Maximalsatz gehoert nach beiden, nicht dazwischen. */
+  const blk = list[puIdx].blk;
+  let pos = puIdx;
+  while (blk && pos + 1 < list.length && list[pos + 1].blk === blk) pos++;
+  list.splice(pos + 1, 0, item);
+}
 function startSession(id, extra){
   const p = planOf(id), sets = {}, weights = {}, cf = {};
   const list = p.ex.slice();
@@ -7447,7 +7468,7 @@ function startSession(id, extra){
      einzelner Satz, so viele wie gehen, genau wie an den Zugtagen. */
   (extra || []).forEach(m => {
     if (list.some(x => x.id === m.id)) return;
-    list.push(m.id === "pullmax"
+    extraEinfuegen(list, m.id === "pullmax"
       ? {id:"pullmax", sets:1, min:1, max:30, prio:1}
       : {id:m.id, sets:3, min:6, max:10});
   });
@@ -7493,7 +7514,7 @@ function activeExList(){
      einzelner Satz, so viele wie gehen, genau wie an den Zugtagen. */
   (a.extra || []).forEach(id => {
     if (list.some(x => x.id === id)) return;
-    list.push(id === "pullmax"
+    extraEinfuegen(list, id === "pullmax"
       ? {id:"pullmax", sets:1, min:1, max:30, prio:1}
       : {id:id, sets:3, min:6, max:10});
   });
