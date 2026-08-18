@@ -1332,6 +1332,10 @@
     font-size:20px; font-weight:640; color:var(--dim); margin-top:9px;
   }
   .fokus .fk-ziel{font-size:14px; color:var(--muted)}
+  .fokus .fk-hinweis{
+    font-size:13px; color:var(--faint); margin-top:13px;
+    max-width:250px; line-height:1.45;
+  }
 
   /* Die Eingabe ist das Einzige, was waehrend des Satzes angefasst wird.
      Entsprechend gross: die Knoepfe tragen 68 px, damit sie auch mit
@@ -5176,6 +5180,40 @@ function fokusSchritt(){
   if (!S.active) return null;
   return ablaufOffen()[0] || null;
 }
+/* Das Tagesziel bei den Klimmzuegen. Zwanzig saubere Wiederholungen pro
+   Einheit — eine Zahl, die man im Kopf behaelt, und die unabhaengig davon
+   gilt, ob die Saetze 8/7/5 oder 7/7/6 waren.
+
+   Der Zusatzsatz laeuft als `pullmax`, nicht als vierter `pullup`-Satz. Das
+   loest drei Dinge auf einmal: das Ziel "Strikte Klimmzuege" bekommt wieder
+   Werte (mit 6–8 kaeme es nie ueber Etappe 8), die Regel "alle Saetze im
+   Ziel" bleibt unberuehrt (`evaluate` laeuft ueber `plan.ex`, und dort steht
+   `pullmax` nicht), und die Uebung gibt es schon samt Zeichnung. */
+const KLIMM_TAGESZIEL = 20;
+function klimmStand(){
+  if (!S.active) return {summe:0, offen:0};
+  const zaehl = id => (S.active.sets[id] || [])
+    .filter(s => s.done).reduce((a, s) => a + (+s.reps || 0), 0);
+  const summe = zaehl("pullup") + zaehl("pullmax");
+  return {summe:summe, offen:Math.max(0, KLIMM_TAGESZIEL - summe)};
+}
+/* Sind alle Klimmzugsaetze abgehakt und die Uebung damit durch? Nur dann
+   steht die Frage nach dem Zusatzsatz an — mitten im Block waere sie eine
+   Aufforderung, die naechste Runde ausfallen zu lassen. */
+function klimmDurch(){
+  if (!S.active) return false;
+  const rows = S.active.sets.pullup || [];
+  return rows.length > 0 && rows.every(s => s.done);
+}
+function zusatzsatz(){
+  const a = S.active;
+  if (!a || (a.extra || []).indexOf("pullmax") >= 0) return;
+  a.extra = (a.extra || []).concat(["pullmax"]);
+  a.sets.pullmax = [{reps:5, done:false}];
+  if (a.weights.pullmax === undefined) a.weights.pullmax = a.weights.pullup || 0;
+  if (!a.cfg.pullmax) a.cfg.pullmax = cfgOf("pullmax");
+  save();
+}
 function viewFokus(){
   const a = S.active, plan = planOf(a.plan);
   const prog = sessionProgress();
@@ -5222,6 +5260,32 @@ function viewFokus(){
      ausser dem, was danach kommt. Das ist die eine Frage, die man in der
      Pause hat. */
   if (S.rest && restLeft() > 0) return '<div class="fokus">' + kopf + fokusPause(s) + '</div>';
+
+  const kl = klimmStand();
+  const hatZusatz = (a.extra || []).indexOf("pullmax") >= 0;
+  /* Der Block ist durch, wenn der naechste offene Schritt nicht mehr dazu
+     gehoert. Auf `klimmDurch()` allein zu pruefen hiesse, mitten im Wechsel
+     nach dem Zusatzsatz zu fragen, waehrend noch ein Dipsatz aussteht. */
+  const blockDurch = klimmDurch()
+    && (!s || (s.cfg && s.cfg.blk) !== (slotOf("pullup", a.plan) || {}).blk);
+  if (blockDurch && !hatZusatz && !a.zusatzWeg) {
+    const zuViel = (formForToday() && formForToday().level === "gelb")
+                || systemLoad().level !== "normal";
+    return '<div class="fokus">' + kopf
+      + '<div class="fk-buehne">'
+      + '<div class="fk-uebung">'+kl.summe+' Klimmzüge</div>'
+      + (kl.offen && !zuViel
+          ? '<div class="fk-ziel">Noch '+kl.offen+' bis zum Tagesziel</div>'
+          : zuViel
+          ? '<div class="fk-ziel">Heute nicht erzwingen.</div>'
+          : '<div class="fk-ziel">Tagesziel erreicht.</div>')
+      + '<div class="fk-hinweis">Zusatzsatz — so viele wie sauber gehen</div>'
+      + '</div>'
+      + '<div class="fk-fuss">'
+      + '<button class="btn'+(kl.offen && !zuViel ? '' : ' ghost')+'" data-a="zusatz">Zusatzsatz machen</button>'
+      + '<button class="btn ghost" data-a="zusatzweg">Reicht für heute</button>'
+      + '</div><div id="restslot"></div></div>';
+  }
 
   if (s.art === "aufwaerm") {
     return '<div class="fokus">' + kopf
@@ -7379,7 +7443,14 @@ function importSheet(data){
 function startSession(id, extra){
   const p = planOf(id), sets = {}, weights = {}, cf = {};
   const list = p.ex.slice();
-  (extra || []).forEach(m => { if (!list.some(x => x.id === m.id)) list.push({id:m.id, sets:3, min:6, max:10}); });
+  /* Extras erben pauschal drei Saetze — ausser `pullmax`: das ist ein
+     einzelner Satz, so viele wie gehen, genau wie an den Zugtagen. */
+  (extra || []).forEach(m => {
+    if (list.some(x => x.id === m.id)) return;
+    list.push(m.id === "pullmax"
+      ? {id:"pullmax", sets:1, min:1, max:30, prio:1}
+      : {id:m.id, sets:3, min:6, max:10});
+  });
   list.forEach(e => {
     sets[e.id] = [];
     for (let i = 0; i < e.sets; i++) sets[e.id].push({reps:e.max, done:false});
@@ -7418,7 +7489,14 @@ function activeExList(){
   const list = p.ex.map(e => ers[e.id]
     ? Object.assign({}, e, {id: ers[e.id], statt: e.id})
     : e);
-  (a.extra || []).forEach(id => { if (!list.some(x => x.id === id)) list.push({id:id, sets:3, min:6, max:10}); });
+  /* Extras erben pauschal drei Saetze — ausser `pullmax`: das ist ein
+     einzelner Satz, so viele wie gehen, genau wie an den Zugtagen. */
+  (a.extra || []).forEach(id => {
+    if (list.some(x => x.id === id)) return;
+    list.push(id === "pullmax"
+      ? {id:"pullmax", sets:1, min:1, max:30, prio:1}
+      : {id:id, sets:3, min:6, max:10});
+  });
   return list;
 }
 
@@ -8172,6 +8250,8 @@ document.addEventListener("click", ev => {
     updateCount(); return;
   }
   if (a === "skiprest") { S.rest = null; restDone = true; pausePlanen(); save(); renderRest(); return; }
+  if (a === "zusatz") { zusatzsatz(); render(); return; }
+  if (a === "zusatzweg") { S.active.zusatzWeg = true; save(); render(); return; }
   if (a === "finish") { abschlussPruefen(); return; }
   if (a === "abbruchdo") {
     buzz();
