@@ -2322,6 +2322,16 @@ const uebergangDauer = voll => Math.max(45, Math.min(90, Math.round((+voll || 0)
    eine Anleitung, kein Teil der Einheit. */
 const AUFWAERM_STUFEN = [[0.4, 8], [0.6, 5], [0.8, 3]];
 const AUFWAERM_MIN = 20;   /* darunter lohnt kein Aufbau — dann direkt los */
+/* Der Uebergang zwischen zwei Aufwaermstufen — und in den ersten
+   Arbeitssatz hinein, ebenfalls: davor will man frisch sein, aber ein Satz
+   auf 80 Prozent ermuedet kaum, und die volle Pause der Uebung (180 s bei
+   Kreuzheben) waere dafuer masslos ueberzogen. 60 Sekunden reichen fuers
+   Umstellen — am Geraet die Stufe, an der Langhantel die Scheiben — und
+   treffen mit drei Stufen plus Uebergaengen rechnerisch die veranschlagten
+   ~5 Minuten Aufwaermzeit fast genau (3 Saetze + 3 Uebergaenge ≈ 288 s).
+   `folgeDauer` und `startRest` rechnen beide mit dieser einen Zahl, sonst
+   zeigt der Kopf eine andere Restzeit an, als tatsaechlich ablaeuft. */
+const AUFWAERM_UEBERGANG_S = 60;
 
 function aufwaermPlan(exId, gewicht){
   if (restFor(exId) < 180) return null;
@@ -3988,7 +3998,11 @@ function ablaufOffen(){
 /* Die Dauer einer Schrittfolge. Je Schritt: die Zeit des Satzes selbst, dann
    die Pause, die danach faellt. Welche das ist, entscheidet allein der
    naechste Schritt — dieselbe Uebung heisst volle Pause, eine andere den
-   kuerzeren Uebergang, kein naechster Schritt gar keine.
+   kuerzeren Uebergang, kein naechster Schritt gar keine. Kommt der Schritt
+   selbst aus dem Aufwaermen, gilt das nicht: dann ist es immer der kurze
+   Aufwaerm-Uebergang, auch wenn danach derselbe Arbeitssatz folgt — eine
+   volle Pause waere fuer einen Satz auf 40 oder 80 Prozent des Gewichts
+   masslos ueberzogen.
 
    Vorher rechnete diese Funktion je Uebung und setzte damit voraus, dass
    alle Saetze einer Uebung am Stueck laufen. Mit Wechselsaetzen stimmt das
@@ -4003,7 +4017,8 @@ function folgeDauer(schritte){
     sek += 20 + (istZeit(s.ex) ? wdh : wdh * 3);
     const n = schritte[i + 1];
     if (!n) return;
-    sek += n.ex === s.ex ? restFor(s.ex) : uebergangDauer(restFor(s.ex));
+    sek += s.art === "aufwaerm" && n.ex === s.ex ? AUFWAERM_UEBERGANG_S
+         : n.ex === s.ex ? restFor(s.ex) : uebergangDauer(restFor(s.ex));
   });
   return sek;
 }
@@ -5295,7 +5310,8 @@ function fokusPause(naechster){
   }
   return '<div class="fk-buehne">'
     + '<div class="fk-count num" id="fkrest">'+txt+'</div>'
-    + '<div class="fk-pauselbl">'+(S.rest && S.rest.wechsel ? 'Übergang' : 'Pause')+'</div>'
+    + '<div class="fk-pauselbl">'+(S.rest && S.rest.aufwaerm ? 'Aufwärmen'
+        : S.rest && S.rest.wechsel ? 'Übergang' : 'Pause')+'</div>'
     + unten + '</div>'
     + '<div class="fk-fuss">'
     + '<button class="btn ghost" data-a="skiprest">Pause überspringen</button>'
@@ -5639,10 +5655,14 @@ function renderRest(){
   const txt = over ? "00:00" : m + ":" + sec;
   if (t && t.textContent !== txt) t.textContent = txt;
   const lbl = document.querySelector("#restlbl span");
-  /* Dieselbe Zeile traegt drei Dinge: Aufwaermen vor dem Start, die Pause
-     zwischen Saetzen und den kuerzeren Uebergang zwischen zwei Uebungen.
-     Ein eigenes Bauteil je Fall waere dreimal derselbe Balken. */
+  /* Dieselbe Zeile traegt vier Dinge: das allgemeine Aufwaermen vor dem
+     Start (`S.rest.warm`), den Uebergang zwischen zwei Aufwaermstufen einer
+     Uebung (`S.rest.aufwaerm` — eigenes Feld, eigene kurze Dauer, siehe
+     `startRest`), die Pause zwischen Saetzen und den kuerzeren Uebergang
+     zwischen zwei Uebungen. Ein eigenes Bauteil je Fall waere viermal
+     derselbe Balken. */
   const ltxt = S.rest.warm ? (over ? "Aufgewärmt" : "Aufwärmen")
+             : S.rest.aufwaerm ? (over ? "Weiter" : "Aufwärmen")
              : S.rest.wechsel ? (over ? "Weiter" : "Übergang")
              : (over ? "Pause vorbei" : "Pause");
   if (lbl && lbl.textContent !== ltxt) lbl.textContent = ltxt;
@@ -5666,14 +5686,21 @@ function restArt(exId){
   return {art: offen[0].ex === exId ? "voll" : "wechsel"};
 }
 
-function startRest(exId){
+/* `aufwaerm` markiert die kurze Pause nach einer Aufwaermstufe — dieselbe
+   Konstante, mit der auch `folgeDauer` rechnet (siehe dort). Sie überstimmt
+   `restArt`: eine Aufwaermstufe fuehrt zur eigenen Uebung zurueck (art
+   "voll" nach der bisherigen Logik), aber die volle Pause der Uebung waere
+   hier falsch — das war genau die Luecke, durch die nach dem Abhaken einer
+   Stufe gar keine Pause lief. */
+function startRest(exId, aufwaerm){
   const art = exId ? restArt(exId).art : "voll";
   if (art === "ende") {
     S.rest = null; restDone = true; save(); renderRest(); liveMelden(); pausePlanen(); return;
   }
   const voll = exId ? restFor(exId) : (S.settings.rest || 120);
-  const dauer = art === "wechsel" ? uebergangDauer(voll) : voll;
-  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer, wechsel: art === "wechsel"};
+  const dauer = aufwaerm ? AUFWAERM_UEBERGANG_S : (art === "wechsel" ? uebergangDauer(voll) : voll);
+  S.rest = {endsAt: Date.now() + dauer * 1000, total: dauer,
+            wechsel: art === "wechsel" && !aufwaerm, aufwaerm: !!aufwaerm};
   restDone = false;
   save();
   renderRest();
@@ -5703,12 +5730,20 @@ function zumNaechstenSatz(){
    Die Pause geht als Zeitpunkt hinueber, nicht als Restsekunden: der
    Sperrbildschirm zaehlt daraus selbst herunter, ohne dass die App auch nur
    einmal geweckt wird. */
+/* `warm` unterscheidet einen Aufwaermschritt von einem echten Satz — ohne
+   das meldet die Huelle „Satz 1 von 3" fuer eine Aufwaermstufe, mit falscher
+   Zielzahl (die Anzahl der Arbeitssaetze, nicht der Aufwaermstufen) und ohne
+   jede Kennzeichnung. Auf dem Sperrbildschirm stuende dann etwas anderes als
+   auf dem Schirm in der Hand. */
 function naechsterOffenerSatz(){
   const offen = ablaufOffen();
   if (!offen.length) return null;
   const s = offen[0];
+  if (s.art === "aufwaerm") {
+    return {id:s.ex, nr:s.i + 1, von:warmSchritte(s.ex).length, warm:true};
+  }
   const alle = (S.active.sets[s.ex] || []).length;
-  return {id:s.ex, nr:s.i + 1, von:alle};
+  return {id:s.ex, nr:s.i + 1, von:alle, warm:false};
 }
 function liveMelden(){
   if (typeof window === "undefined" || !window.__training_live) return;
@@ -5720,7 +5755,12 @@ function liveMelden(){
   window.__training_live({
     plan: (pl && pl.title) || "Training",
     ex: s ? exName(s.id) : "Alle Sätze erledigt",
-    satz: s ? ("Satz " + s.nr + " von " + s.von) : "",
+    /* Der Text bleibt fuer sich lesbar, auch fuer eine Huelle, die das neue
+       `warm`-Feld (unten) noch nicht kennt — abwaertskompatibel heisst hier:
+       eine aeltere Huelle ignoriert das zusaetzliche Feld einfach und zeigt
+       trotzdem den richtigen Text. */
+    satz: s ? ((s.warm ? "Aufwärmen " : "Satz ") + s.nr + " von " + s.von) : "",
+    warm: s ? !!s.warm : false,
     done: prog.done, total: prog.total,
     restEnds: laeuft ? S.rest.endsAt : 0,
     restFrom: laeuft ? S.rest.endsAt - S.rest.total * 1000 : 0,
@@ -8009,6 +8049,7 @@ document.addEventListener("click", ev => {
     buzz(11);
     S.active.warm = S.active.warm || {};
     const stufe = +el.dataset.i + 1;
+    const vorherStand = +S.active.warm[id] || 0;
     /* Im Fokusmodus zeigt der Schirm immer nur die naechste offene Stufe —
        ein zweiter Antipp vor dem Fortschreiben (schnelles Doppeltippen) darf
        sie dann nicht wieder auf 0 zuruecksetzen, es gibt dort keinen
@@ -8016,14 +8057,21 @@ document.addEventListener("click", ev => {
        Toggle: dort stehen alle Stufen gleichzeitig, und nochmal auf dieselbe
        hebt einen Vertipper wieder auf (Kommentar oben). */
     S.active.warm[id] = S.active.fokus
-      ? Math.max(+S.active.warm[id] || 0, stufe)
-      : (S.active.warm[id] === stufe ? stufe - 1 : stufe);
+      ? Math.max(vorherStand, stufe)
+      : (vorherStand === stufe ? stufe - 1 : stufe);
     save();
     const box = document.querySelector('[data-sets="'+id+'"]');
     if (box && box.parentElement) {
       const alt = box.parentElement.querySelector(".warmzeile");
       if (alt) alt.outerHTML = aufwaermZeile(id, S.active.weights[id]);
     }
+    /* Nur beim tatsaechlichen Fortschritt eine Pause anstossen — beim
+       Zurueckkorrigieren in der Liste (Stand sinkt) waere eine neue Pause
+       falsch, dafuer war gerade keine Zeit vergangen, nur ein Vertipper. Die
+       Pause selbst ist die kurze Aufwaerm-Uebergangszeit, egal ob danach
+       noch eine Stufe folgt oder schon der erste Arbeitssatz — genau die
+       Zahl, mit der auch `folgeDauer` fuer diesen Schritt rechnet. */
+    if (S.active.warm[id] > vorherStand) startRest(id, true);
     if (S.active.fokus) { render(); return; }
     return;
   }
